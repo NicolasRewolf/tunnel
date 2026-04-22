@@ -3,90 +3,108 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+/// Polished settings screen using native iOS Form patterns.
 struct SettingsView: View {
     @Bindable var appState: AppState
     @State private var photoSelection: PhotosPickerItem?
-    private let ringtoneOptions = ["default_ringtone"]
     private let logger = Logger(subsystem: "rewolf.Tunnel", category: "SettingsView")
 
-    private static let avatarPreviewSize: CGFloat = 56
+    private static let avatarSize: CGFloat = 60
     private static let avatarMaxDimension: CGFloat = 600
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Identité affichée") {
-                    TextField("Nom affiché", text: $appState.config.contactName)
-                    TextField("Sous-titre (ex. mobile)", text: $appState.config.contactSubtitle)
-                    TextField("Numéro affiché", text: $appState.config.fakePhoneNumber)
-                }
-
-                Section("Photo de contact") {
+                // Contact identity
+                Section {
                     HStack(spacing: 14) {
                         avatarPreview
-                            .frame(width: Self.avatarPreviewSize, height: Self.avatarPreviewSize)
 
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 4) {
                             PhotosPicker(
                                 selection: $photoSelection,
                                 matching: .images,
                                 photoLibrary: .shared()
                             ) {
-                                Text(appState.config.contactImageData == nil
-                                     ? "Choisir une photo"
-                                     : "Changer la photo")
+                                Text(appState.config.contactImageData == nil ? "Ajouter une photo" : "Changer la photo")
+                                    .font(.system(size: 15, weight: .medium))
                             }
 
                             if appState.config.contactImageData != nil {
-                                Button("Retirer la photo", role: .destructive) {
+                                Button("Retirer", role: .destructive) {
                                     photoSelection = nil
                                     appState.config.contactImageData = nil
                                 }
+                                .font(.system(size: 13))
                             }
                         }
+
+                        Spacer()
                     }
+                    .padding(.vertical, 4)
+
+                    TextField("Nom", text: $appState.config.contactName)
+                    TextField("Sous-titre", text: $appState.config.contactSubtitle)
+                        .textInputAutocapitalization(.never)
+                    TextField("Numéro", text: $appState.config.fakePhoneNumber)
+                        .keyboardType(.phonePad)
+                } header: {
+                    Text("Contact")
+                } footer: {
+                    Text("Ces informations apparaîtront sur l'écran d'appel.")
                 }
 
-                Section("Comportement") {
-                    Toggle("Répondre avec « Glisser pour répondre »", isOn: $appState.config.useSlideToAnswer)
+                // Behaviour
+                Section {
+                    Toggle("Glisser pour répondre", isOn: $appState.config.useSlideToAnswer)
+                } header: {
+                    Text("Apparence de l'appel")
+                } footer: {
+                    Text("Active pour reproduire l'écran verrouillé d'iPhone.")
                 }
 
-                Section("Sonnerie") {
-                    if ringtoneOptions.count > 1 {
-                        Picker("Sonnerie", selection: $appState.config.ringtoneName) {
-                            ForEach(ringtoneOptions, id: \.self) { option in
-                                Text(localizedRingtoneTitle(for: option)).tag(option)
-                            }
-                        }
-                    } else {
-                        LabeledContent("Sonnerie") {
-                            Text(localizedRingtoneTitle(for: appState.config.ringtoneName))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Text("Si aucun fichier embarqué n'est trouvé, Tunnel utilise une sonnerie système de secours.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Text("Aucune donnée n'est envoyée : tout reste sur cet iPhone.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Aide") {
-                    Button("Revoir l'onboarding Back Tap") {
+                // Help
+                Section {
+                    Button {
                         appState.openOnboarding()
+                    } label: {
+                        HStack {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 24)
+                            Text("Guide Back Tap")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
+                    .foregroundStyle(.primary)
                 }
 
                 Section {
-                    Button("Retour à l'accueil") {
+                    VStack(alignment: .center, spacing: 4) {
+                        Text("Tunnel")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Text("Aucune donnée ne quitte cet iPhone.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .listRowBackground(Color.clear)
+                }
+            }
+            .navigationTitle("Réglages")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Fermer") {
                         appState.goHome()
                     }
                 }
             }
-            .navigationTitle("Réglages")
             .onChange(of: photoSelection) { _, newValue in
                 guard let newValue else { return }
                 Task { await loadPickedPhoto(newValue) }
@@ -94,29 +112,35 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Avatar
+
     @ViewBuilder
     private var avatarPreview: some View {
-        if let data = appState.config.contactImageData,
-           let uiImage = UIImage(data: data) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .scaledToFill()
-                .clipShape(Circle())
-        } else if let imageName = appState.config.contactImageName,
-                  let uiImage = UIImage(named: imageName) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .scaledToFill()
-                .clipShape(Circle())
-        } else {
-            Circle()
-                .fill(.quaternary)
-                .overlay {
+        Group {
+            if let data = appState.config.contactImageData,
+               let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else if let imageName = appState.config.contactImageName,
+                      let uiImage = UIImage(named: imageName) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Color(.tertiarySystemFill)
                     Image(systemName: "person.fill")
+                        .font(.system(size: 26))
                         .foregroundStyle(.secondary)
                 }
+            }
         }
+        .frame(width: Self.avatarSize, height: Self.avatarSize)
+        .clipShape(Circle())
     }
+
+    // MARK: - Photo loading
 
     private func loadPickedPhoto(_ item: PhotosPickerItem) async {
         do {
@@ -139,20 +163,10 @@ struct SettingsView: View {
             logger.error("Failed to load picked photo: \(error.localizedDescription, privacy: .public)")
         }
     }
-
-    private func localizedRingtoneTitle(for option: String) -> String {
-        switch option {
-        case "default_ringtone":
-            return "Par défaut"
-        default:
-            return option
-        }
-    }
 }
 
 private extension UIImage {
     /// Returns a copy of the image scaled so its longest side equals `maxDimension`.
-    /// Aspect ratio preserved. No-op if the image is already smaller.
     func resizedToFit(maxDimension: CGFloat) -> UIImage {
         let longestSide = max(size.width, size.height)
         guard longestSide > maxDimension else { return self }

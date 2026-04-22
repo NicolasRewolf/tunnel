@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// iOS-style "Slide to answer" component mimicking the lock-screen incoming call UI.
+/// iOS 26 Liquid Glass "Slide to answer" component.
 struct SlideToAnswer: View {
     private enum Layout {
-        static let height: CGFloat = 68
+        static let height: CGFloat = 70
         static let knobSize: CGFloat = 60
-        static let padding: CGFloat = 4
+        static let padding: CGFloat = 5
         static let completionRatio: CGFloat = 0.82
     }
 
@@ -20,25 +20,15 @@ struct SlideToAnswer: View {
             let progress = maxTravel == 0 ? 0 : knobOffset / maxTravel
 
             ZStack(alignment: .leading) {
-                // Track background
+                // Glass track (Liquid Glass)
                 Capsule()
-                    .fill(.white.opacity(0.16))
+                    .fill(.clear)
+                    .glassEffect(.regular, in: .capsule)
 
-                // Shimmering "glisser" label
+                // Shimmering hint text
                 Text("glisser pour répondre")
                     .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0.5),
-                                .white,
-                                .white.opacity(0.5)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .shadow(.inner(color: .black.opacity(0), radius: 0))
-                    )
+                    .foregroundStyle(.white)
                     .opacity(1.0 - progress * 1.5)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .mask(
@@ -58,22 +48,20 @@ struct SlideToAnswer: View {
                         }
                     }
 
-                // Circle knob
-                Circle()
-                    .fill(Color(red: 0.22, green: 0.80, blue: 0.36))
+                // Glass knob with green tint
+                Image(systemName: "phone.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
                     .frame(width: Layout.knobSize, height: Layout.knobSize)
-                    .overlay {
-                        Image(systemName: "phone.fill")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 2)
+                    .glassEffect(
+                        .regular.tint(Color(red: 0.20, green: 0.78, blue: 0.35)).interactive(),
+                        in: .circle
+                    )
                     .offset(x: knobOffset + Layout.padding)
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                let translation = min(max(0, value.translation.width), maxTravel)
-                                knobOffset = translation
+                                knobOffset = min(max(0, value.translation.width), maxTravel)
                             }
                             .onEnded { _ in
                                 let completion = maxTravel == 0 ? 0 : knobOffset / maxTravel

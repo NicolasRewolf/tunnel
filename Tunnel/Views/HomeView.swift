@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Premium home screen with proper hierarchy, visual balance, and iOS-grade polish.
+/// iOS 26 Liquid Glass home screen.
+/// Uses `.buttonStyle(.glassProminent)` and `.buttonStyle(.glass)` for native Apple feel.
 struct HomeView: View {
     @Bindable var appState: AppState
     @State private var pulseRing = false
@@ -13,19 +14,16 @@ struct HomeView: View {
                 Spacer()
                     .frame(height: 60)
 
-                // Hero icon
                 heroIcon
                     .padding(.bottom, 40)
 
-                // Title block
                 VStack(spacing: 8) {
                     Text("Tunnel")
-                        .font(.system(size: 42, weight: .bold, design: .default))
-                        .foregroundStyle(.primary)
-                        .tracking(-0.5)
+                        .font(.system(size: 44, weight: .bold, design: .default))
+                        .tracking(-0.8)
 
                     Text("Sortir d'une conversation en un geste.")
-                        .font(.system(size: 17, weight: .regular))
+                        .font(.system(size: 17))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
@@ -33,7 +31,7 @@ struct HomeView: View {
 
                 Spacer()
 
-                // Primary CTA
+                // Primary CTA — Liquid Glass prominent button
                 Button(action: {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     appState.triggerFakeCallNow()
@@ -44,45 +42,38 @@ struct HomeView: View {
                         Text("Lancer un faux appel")
                             .font(.system(size: 17, weight: .semibold))
                     }
-                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.22, green: 0.80, blue: 0.36),
-                                Color(red: 0.16, green: 0.70, blue: 0.30)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .shadow(color: Color(red: 0.16, green: 0.70, blue: 0.30).opacity(0.35), radius: 16, x: 0, y: 8)
+                    .padding(.vertical, 6)
                 }
-                .buttonStyle(PressableCTAStyle())
+                .buttonStyle(.glassProminent)
+                .controlSize(.extraLarge)
+                .tint(Color(red: 0.20, green: 0.78, blue: 0.35))
 
-                // Secondary actions
-                HStack(spacing: 0) {
-                    secondaryButton(
-                        icon: "hand.tap.fill",
-                        label: "Back Tap",
-                        action: { appState.openOnboarding() }
-                    )
+                // Secondary glass buttons
+                HStack(spacing: 12) {
+                    Button {
+                        appState.openOnboarding()
+                    } label: {
+                        Label("Back Tap", systemImage: "hand.tap.fill")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
 
-                    Divider()
-                        .frame(height: 28)
-                        .overlay(.separator)
-
-                    secondaryButton(
-                        icon: "gearshape.fill",
-                        label: "Réglages",
-                        action: { appState.openSettings() }
-                    )
+                    Button {
+                        appState.openSettings()
+                    } label: {
+                        Label("Réglages", systemImage: "gearshape.fill")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
                 }
-                .padding(.top, 14)
+                .padding(.top, 12)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
     }
@@ -94,18 +85,27 @@ struct HomeView: View {
             Color(.systemGroupedBackground)
                 .ignoresSafeArea()
 
-            // Subtle green gradient tint (echoes the CTA)
             RadialGradient(
                 colors: [
-                    Color(red: 0.16, green: 0.70, blue: 0.30).opacity(0.12),
+                    Color(red: 0.20, green: 0.78, blue: 0.35).opacity(0.15),
                     .clear
                 ],
-                center: .init(x: 0.5, y: 0.25),
+                center: .init(x: 0.5, y: 0.22),
                 startRadius: 0,
                 endRadius: 420
             )
             .ignoresSafeArea()
-            .blendMode(.plusLighter)
+
+            RadialGradient(
+                colors: [
+                    Color.accentColor.opacity(0.10),
+                    .clear
+                ],
+                center: .init(x: 0.5, y: 0.85),
+                startRadius: 0,
+                endRadius: 380
+            )
+            .ignoresSafeArea()
         }
     }
 
@@ -113,68 +113,40 @@ struct HomeView: View {
 
     private var heroIcon: some View {
         ZStack {
-            // Pulsing ring
+            // Outer pulsing ring
             Circle()
-                .stroke(Color(red: 0.16, green: 0.70, blue: 0.30).opacity(0.20), lineWidth: 1)
-                .frame(width: 160, height: 160)
-                .scaleEffect(pulseRing ? 1.1 : 1.0)
+                .stroke(Color(red: 0.20, green: 0.78, blue: 0.35).opacity(0.25), lineWidth: 1)
+                .frame(width: 170, height: 170)
+                .scaleEffect(pulseRing ? 1.12 : 1.0)
                 .opacity(pulseRing ? 0 : 1)
                 .animation(
-                    .easeOut(duration: 2.0).repeatForever(autoreverses: false),
+                    .easeOut(duration: 2.2).repeatForever(autoreverses: false),
                     value: pulseRing
                 )
 
+            // Middle pulsing ring (staggered)
             Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.22, green: 0.80, blue: 0.36),
-                            Color(red: 0.14, green: 0.62, blue: 0.28)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                .stroke(Color(red: 0.20, green: 0.78, blue: 0.35).opacity(0.35), lineWidth: 1)
+                .frame(width: 150, height: 150)
+                .scaleEffect(pulseRing ? 1.15 : 1.0)
+                .opacity(pulseRing ? 0 : 1)
+                .animation(
+                    .easeOut(duration: 2.2).repeatForever(autoreverses: false).delay(0.6),
+                    value: pulseRing
                 )
-                .frame(width: 120, height: 120)
-                .shadow(color: Color(red: 0.16, green: 0.70, blue: 0.30).opacity(0.4), radius: 20, x: 0, y: 10)
-                .overlay {
-                    Image(systemName: "phone.fill")
-                        .font(.system(size: 48, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
+
+            // Core button
+            Image(systemName: "phone.fill")
+                .font(.system(size: 52, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 130, height: 130)
+                .glassEffect(
+                    .regular.tint(Color(red: 0.20, green: 0.78, blue: 0.35)),
+                    in: .circle
+                )
+                .shadow(color: Color(red: 0.16, green: 0.70, blue: 0.30).opacity(0.5), radius: 22, x: 0, y: 10)
         }
         .onAppear { pulseRing = true }
-    }
-
-    // MARK: - Secondary button
-
-    private func secondaryButton(
-        icon: String,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                Text(label)
-                    .font(.system(size: 15, weight: .medium))
-            }
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct PressableCTAStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: configuration.isPressed)
     }
 }
 

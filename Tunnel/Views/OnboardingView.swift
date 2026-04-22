@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Polished onboarding screen explaining the Back Tap setup.
+/// iOS 26 Liquid Glass onboarding screen.
 struct OnboardingView: View {
     let appState: AppState
 
@@ -16,37 +16,40 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 32) {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Active Back Tap")
-                            .font(.system(size: 34, weight: .bold, design: .default))
+                            .font(.system(size: 34, weight: .bold))
                             .tracking(-0.5)
 
-                        Text("Déclenche un faux appel en tapotant simplement l'arrière de ton iPhone.")
+                        Text("Déclenche un faux appel en tapotant l'arrière de ton iPhone.")
                             .font(.system(size: 17))
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top, 8)
 
-                    // Steps
+                    // Steps with Liquid Glass container
                     VStack(spacing: 0) {
                         ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                             stepRow(step)
 
                             if index < steps.count - 1 {
                                 Divider()
-                                    .padding(.leading, 56)
+                                    .padding(.leading, 60)
                             }
                         }
                     }
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(.clear)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    }
 
-                    // Tip
+                    // Tip row
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "lightbulb.fill")
                             .font(.system(size: 15))
                             .foregroundStyle(Color(red: 1.0, green: 0.78, blue: 0.18))
                             .padding(.top, 2)
 
-                        Text("Tu peux tester Tunnel à tout moment avec le bouton \"Lancer un faux appel\" depuis l'accueil.")
+                        Text("Tu peux tester Tunnel à tout moment avec le bouton **Lancer un faux appel** depuis l'accueil.")
                             .font(.system(size: 15))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -55,16 +58,17 @@ struct OnboardingView: View {
                     Spacer(minLength: 40)
 
                     VStack(spacing: 10) {
-                        Button(action: { appState.completeOnboarding() }) {
+                        Button {
+                            appState.completeOnboarding()
+                        } label: {
                             Text("J'ai configuré Back Tap")
                                 .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.accentColor)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .padding(.vertical, 6)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.extraLarge)
+                        .tint(Color.accentColor)
 
                         Button("Configurer plus tard") {
                             appState.dismissOnboarding()
@@ -83,21 +87,19 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Row
-
     private func stepRow(_ step: (number: String, title: String, subtitle: String)) -> some View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.12))
-                    .frame(width: 32, height: 32)
+                    .fill(Color.accentColor.opacity(0.15))
+                    .frame(width: 34, height: 34)
 
                 Text(step.number)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.accentColor)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(step.title)
                     .font(.system(size: 17, weight: .medium))
 
@@ -108,7 +110,7 @@ struct OnboardingView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 18)
         .padding(.vertical, 14)
     }
 }

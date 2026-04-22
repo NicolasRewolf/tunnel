@@ -1,18 +1,19 @@
 import SwiftUI
 
-/// Pixel-perfect iOS 17 in-call screen.
-/// Matches Apple's native in-call UI with the 2x3 controls grid and red End button.
+/// iOS 26 Liquid Glass in-call screen.
+/// Uses GlassEffectContainer for the 2x3 controls grid + tinted glass End button.
 struct InCallView: View {
     private enum Layout {
-        static let avatarSize: CGFloat = 70
+        static let avatarSize: CGFloat = 72
         static let topPadding: CGFloat = 64
         static let bottomPadding: CGFloat = 48
-        static let endButtonSize: CGFloat = 72
-        static let gridSpacing: CGFloat = 24
+        static let endButtonSize: CGFloat = 74
+        static let gridSpacing: CGFloat = 28
     }
 
     let appState: AppState
     @State private var callStartDate = Date()
+    @Namespace private var glassNamespace
 
     var body: some View {
         ZStack {
@@ -22,9 +23,8 @@ struct InCallView: View {
                 Spacer()
                     .frame(height: Layout.topPadding)
 
-                // Top identity block (compact, like iOS in-call)
                 contactAvatar
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 14)
 
                 Text(appState.config.contactName)
                     .font(.system(size: 22, weight: .semibold))
@@ -32,47 +32,55 @@ struct InCallView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.horizontal, 24)
+                    .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 1)
 
                 TimelineView(.periodic(from: callStartDate, by: 1)) { timeline in
                     Text(durationLabel(for: timeline.date))
-                        .font(.system(size: 15, weight: .regular, design: .default))
-                        .foregroundStyle(.white.opacity(0.65))
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.7))
                         .monospacedDigit()
                 }
-                .padding(.top, 3)
+                .padding(.top, 4)
 
                 Spacer()
 
-                // 2x3 Controls grid (iOS native layout)
                 controlsGrid
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 40)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 36)
 
-                // End button
                 endCallButton
                     .padding(.bottom, Layout.bottomPadding)
             }
         }
         .statusBarHidden(true)
         .preferredColorScheme(.dark)
-        .onAppear {
-            callStartDate = Date()
-        }
+        .onAppear { callStartDate = Date() }
     }
 
     // MARK: - Background
 
     private var backgroundLayer: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.04, green: 0.05, blue: 0.08),
-                Color(red: 0.07, green: 0.08, blue: 0.12),
-                Color(red: 0.02, green: 0.03, blue: 0.05)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.07, green: 0.08, blue: 0.12),
+                    Color(red: 0.04, green: 0.06, blue: 0.10),
+                    Color(red: 0.02, green: 0.03, blue: 0.06)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            RadialGradient(
+                colors: [Color(red: 0.20, green: 0.26, blue: 0.40).opacity(0.25), .clear],
+                center: .init(x: 0.5, y: 0.35),
+                startRadius: 0,
+                endRadius: 360
+            )
+            .ignoresSafeArea()
+            .blendMode(.screen)
+        }
     }
 
     // MARK: - Avatar
@@ -86,98 +94,82 @@ struct InCallView: View {
                 .scaledToFill()
                 .frame(width: Layout.avatarSize, height: Layout.avatarSize)
                 .clipShape(Circle())
+                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 2)
         } else {
-            Circle()
-                .fill(.white.opacity(0.18))
-                .frame(width: Layout.avatarSize, height: Layout.avatarSize)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 32, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
+            ZStack {
+                Circle()
+                    .fill(.white.opacity(0.08))
+                    .glassEffect(.regular, in: .circle)
+                    .frame(width: Layout.avatarSize, height: Layout.avatarSize)
+
+                Image(systemName: "person.fill")
+                    .font(.system(size: 34, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
         }
     }
 
-    // MARK: - Controls grid
+    // MARK: - Controls grid (Liquid Glass)
 
     private var controlsGrid: some View {
-        VStack(spacing: Layout.gridSpacing) {
-            HStack(spacing: Layout.gridSpacing) {
-                inCallControl(icon: "mic.slash.fill", label: "Silence")
-                inCallControl(icon: "square.grid.3x3.fill", label: "Clavier")
-                inCallControl(icon: "speaker.wave.2.fill", label: "Haut-parleur")
-            }
-            HStack(spacing: Layout.gridSpacing) {
-                inCallControl(icon: "plus", label: "Ajouter")
-                inCallControl(icon: "video.fill", label: "FaceTime")
-                inCallControl(icon: "person.crop.circle.fill", label: "Contacts")
+        GlassEffectContainer(spacing: 20) {
+            VStack(spacing: Layout.gridSpacing) {
+                HStack(spacing: Layout.gridSpacing) {
+                    controlButton(icon: "mic.slash.fill", label: "Silence", id: "mute")
+                    controlButton(icon: "square.grid.3x3.fill", label: "Clavier", id: "keypad")
+                    controlButton(icon: "speaker.wave.2.fill", label: "Haut-parleur", id: "speaker")
+                }
+                HStack(spacing: Layout.gridSpacing) {
+                    controlButton(icon: "plus", label: "Ajouter", id: "add")
+                    controlButton(icon: "video.fill", label: "FaceTime", id: "facetime")
+                    controlButton(icon: "person.crop.circle.fill", label: "Contacts", id: "contacts")
+                }
             }
         }
     }
 
-    private func inCallControl(icon: String, label: String) -> some View {
-        // Decorative, non-interactive controls matching iOS in-call UI for realism.
+    private func controlButton(icon: String, label: String, id: String) -> some View {
         VStack(spacing: 8) {
-            Circle()
-                .fill(.white.opacity(0.16))
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .regular))
+                .foregroundStyle(.white)
                 .frame(width: 68, height: 68)
-                .overlay {
-                    Image(systemName: icon)
-                        .font(.system(size: 24, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.92))
-                }
+                .glassEffect(.regular.interactive(), in: .circle)
+                .glassEffectID(id, in: glassNamespace)
 
             Text(label)
                 .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(.white.opacity(0.88))
                 .frame(minWidth: 80)
         }
         .accessibilityHidden(true)
     }
 
-    // MARK: - End button
+    // MARK: - End button (tinted Liquid Glass)
 
     private var endCallButton: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             appState.endCall()
         }) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(red: 0.98, green: 0.28, blue: 0.30), Color(red: 0.86, green: 0.16, blue: 0.22)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            Image(systemName: "phone.down.fill")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.white)
                 .frame(width: Layout.endButtonSize, height: Layout.endButtonSize)
-                .overlay {
-                    Image(systemName: "phone.down.fill")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 4)
+                .glassEffect(
+                    .regular.tint(Color(red: 0.97, green: 0.26, blue: 0.28)).interactive(),
+                    in: .circle
+                )
         }
-        .buttonStyle(PressableButtonStyle())
+        .buttonStyle(.plain)
         .accessibilityLabel("Raccrocher")
     }
-
-    // MARK: - Helpers
 
     private func durationLabel(for date: Date) -> String {
         let interval = max(0, date.timeIntervalSince(callStartDate))
         let minutes = Int(interval) / 60
         let seconds = Int(interval) % 60
         return String(format: "%02d:%02d", minutes, seconds)
-    }
-}
-
-private struct PressableButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: configuration.isPressed)
     }
 }
 

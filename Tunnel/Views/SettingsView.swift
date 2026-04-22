@@ -21,12 +21,13 @@ struct SettingsView: View {
                         avatarPreview
 
                         VStack(alignment: .leading, spacing: 4) {
+                            let pickerLabel = appState.config.contactImageData == nil ? "Ajouter une photo" : "Changer la photo"
                             PhotosPicker(
                                 selection: $photoSelection,
                                 matching: .images,
                                 photoLibrary: .shared()
                             ) {
-                                Text(appState.config.contactImageData == nil ? "Ajouter une photo" : "Changer la photo")
+                                Text(pickerLabel)
                                     .font(.system(size: 15, weight: .medium))
                             }
 

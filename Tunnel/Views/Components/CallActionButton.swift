@@ -1,58 +1,39 @@
 import SwiftUI
 import UIKit
 
-/// iOS-style circular call action button with optional label underneath.
-/// Matches Apple's CallKit-style primary action buttons.
+/// iOS 26 Liquid Glass call action button.
+/// Uses `.glassEffect()` with tinted colors and interactive feedback.
 struct CallActionButton: View {
     enum Size {
-        case regular // 72pt (primary accept/decline)
-        case small   // 64pt (secondary actions)
+        case regular
+        case small
 
         var diameter: CGFloat {
             switch self {
-            case .regular: return 72
-            case .small: return 64
+            case .regular: return 78
+            case .small: return 62
             }
         }
 
         var iconSize: CGFloat {
             switch self {
             case .regular: return 30
-            case .small: return 24
+            case .small: return 22
             }
         }
     }
 
     enum Style {
-        case accept     // green filled
-        case decline    // red filled
-        case secondary  // translucent white
+        case accept
+        case decline
+        case secondary
 
-        var background: AnyShapeStyle {
+        var tint: Color? {
             switch self {
-            case .accept:
-                return AnyShapeStyle(
-                    LinearGradient(
-                        colors: [Color(red: 0.22, green: 0.80, blue: 0.36), Color(red: 0.16, green: 0.70, blue: 0.30)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            case .decline:
-                return AnyShapeStyle(
-                    LinearGradient(
-                        colors: [Color(red: 0.98, green: 0.28, blue: 0.30), Color(red: 0.86, green: 0.16, blue: 0.22)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            case .secondary:
-                return AnyShapeStyle(Color.white.opacity(0.18))
+            case .accept: return Color(red: 0.20, green: 0.78, blue: 0.35)
+            case .decline: return Color(red: 0.97, green: 0.26, blue: 0.28)
+            case .secondary: return nil
             }
-        }
-
-        var iconColor: Color {
-            .white
         }
     }
 
@@ -80,28 +61,31 @@ struct CallActionButton: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Button(action: didTapButton) {
-                Circle()
-                    .fill(style.background)
+                Image(systemName: systemImage)
+                    .font(.system(size: size.iconSize, weight: .semibold))
+                    .foregroundStyle(.white)
                     .frame(width: size.diameter, height: size.diameter)
-                    .overlay {
-                        Image(systemName: systemImage)
-                            .font(.system(size: size.iconSize, weight: .semibold))
-                            .foregroundStyle(style.iconColor)
-                    }
-                    .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 2)
+                    .glassEffect(glassEffectStyle, in: .circle)
             }
-            .buttonStyle(PressableCircleButtonStyle())
+            .buttonStyle(.plain)
             .accessibilityLabel(accessibilityLabel)
 
             if let title {
                 Text(title)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(.white.opacity(0.92))
                     .frame(minWidth: 80)
             }
         }
+    }
+
+    private var glassEffectStyle: Glass {
+        if let tint = style.tint {
+            return .regular.tint(tint).interactive()
+        }
+        return .regular.interactive()
     }
 
     private func didTapButton() {
@@ -110,33 +94,53 @@ struct CallActionButton: View {
     }
 }
 
-private struct PressableCircleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: configuration.isPressed)
-    }
-}
-
 #Preview {
-    HStack(spacing: 80) {
-        CallActionButton(
-            systemImage: "phone.down.fill",
-            style: .decline,
-            accessibilityLabel: "Raccrocher",
-            title: "Refuser",
-            action: {}
+    ZStack {
+        LinearGradient(
+            colors: [.black, Color(red: 0.08, green: 0.10, blue: 0.14)],
+            startPoint: .top,
+            endPoint: .bottom
         )
+        .ignoresSafeArea()
 
-        CallActionButton(
-            systemImage: "phone.fill",
-            style: .accept,
-            accessibilityLabel: "Répondre",
-            title: "Accepter",
-            action: {}
-        )
+        VStack(spacing: 40) {
+            HStack(spacing: 80) {
+                CallActionButton(
+                    systemImage: "phone.down.fill",
+                    style: .decline,
+                    accessibilityLabel: "Raccrocher",
+                    title: "Refuser",
+                    action: {}
+                )
+
+                CallActionButton(
+                    systemImage: "phone.fill",
+                    style: .accept,
+                    accessibilityLabel: "Répondre",
+                    title: "Accepter",
+                    action: {}
+                )
+            }
+
+            HStack(spacing: 40) {
+                CallActionButton(
+                    systemImage: "mic.slash.fill",
+                    style: .secondary,
+                    size: .small,
+                    accessibilityLabel: "Silence",
+                    title: "Silence",
+                    action: {}
+                )
+
+                CallActionButton(
+                    systemImage: "speaker.wave.2.fill",
+                    style: .secondary,
+                    size: .small,
+                    accessibilityLabel: "Haut-parleur",
+                    title: "Haut-parleur",
+                    action: {}
+                )
+            }
+        }
     }
-    .padding()
-    .background(.black)
 }

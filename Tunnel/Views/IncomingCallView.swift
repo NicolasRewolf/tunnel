@@ -1,47 +1,48 @@
 import SwiftUI
 
-/// Pixel-perfect iOS 17 incoming call screen.
-/// Matches Apple's native call UI with proper spacing, typography, and controls.
+/// iOS 26 Liquid Glass incoming call screen.
+/// Uses GlassEffectContainer for morphing glass elements + native glass buttons.
 struct IncomingCallView: View {
     private enum Layout {
-        static let avatarSize: CGFloat = 132
-        static let topPadding: CGFloat = 60
+        static let avatarSize: CGFloat = 136
+        static let topPadding: CGFloat = 56
         static let bottomPadding: CGFloat = 48
-        static let secondaryRowSpacing: CGFloat = 38
-        static let primaryRowSpacing: CGFloat = 80
+        static let secondaryRowSpacing: CGFloat = 44
+        static let primaryRowSpacing: CGFloat = 72
     }
 
     let appState: AppState
+    @Namespace private var glassNamespace
 
     var body: some View {
         ZStack {
             backgroundLayer
 
             VStack(spacing: 0) {
-                // Top: contact identity block
                 Spacer()
                     .frame(height: Layout.topPadding)
 
                 contactAvatar
-                    .padding(.bottom, 22)
+                    .padding(.bottom, 24)
 
                 Text(appState.config.contactName)
-                    .font(.system(size: 32, weight: .semibold, design: .default))
+                    .font(.system(size: 34, weight: .semibold, design: .default))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.horizontal, 24)
+                    .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 2)
 
                 Text(appState.config.contactSubtitle)
                     .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(.top, 6)
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.top, 4)
+                    .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 1)
 
                 Spacer()
 
-                // Bottom: action buttons
                 actionArea
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, 28)
                     .padding(.bottom, Layout.bottomPadding)
             }
         }
@@ -53,23 +54,40 @@ struct IncomingCallView: View {
 
     private var backgroundLayer: some View {
         ZStack {
+            // Rich ambient gradient with depth (iOS 26 style)
             LinearGradient(
                 colors: [
-                    Color(red: 0.04, green: 0.05, blue: 0.08),
-                    Color(red: 0.08, green: 0.10, blue: 0.14),
-                    Color(red: 0.02, green: 0.03, blue: 0.05)
+                    Color(red: 0.09, green: 0.10, blue: 0.16),
+                    Color(red: 0.06, green: 0.08, blue: 0.14),
+                    Color(red: 0.02, green: 0.03, blue: 0.07)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
 
-            // Subtle top spotlight (like iOS native call UI)
+            // Mesh-like color bloom behind avatar
             RadialGradient(
-                colors: [Color.white.opacity(0.08), .clear],
-                center: .init(x: 0.5, y: 0.15),
+                colors: [
+                    Color(red: 0.30, green: 0.34, blue: 0.50).opacity(0.45),
+                    .clear
+                ],
+                center: .init(x: 0.5, y: 0.22),
                 startRadius: 0,
-                endRadius: 400
+                endRadius: 420
+            )
+            .ignoresSafeArea()
+            .blendMode(.screen)
+
+            // Subtle bottom warm glow
+            RadialGradient(
+                colors: [
+                    Color(red: 0.18, green: 0.10, blue: 0.30).opacity(0.30),
+                    .clear
+                ],
+                center: .init(x: 0.5, y: 0.95),
+                startRadius: 0,
+                endRadius: 380
             )
             .ignoresSafeArea()
             .blendMode(.screen)
@@ -87,28 +105,16 @@ struct IncomingCallView: View {
                   let uiImage = UIImage(named: imageName) {
             avatarImage(uiImage)
         } else {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.22),
-                            Color.white.opacity(0.10)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: Layout.avatarSize, height: Layout.avatarSize)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 58, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.75))
-                }
-                .overlay {
-                    Circle()
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 4)
+            ZStack {
+                Circle()
+                    .fill(.white.opacity(0.08))
+                    .glassEffect(.regular, in: .circle)
+                    .frame(width: Layout.avatarSize, height: Layout.avatarSize)
+
+                Image(systemName: "person.fill")
+                    .font(.system(size: 60, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
         }
     }
 
@@ -119,10 +125,9 @@ struct IncomingCallView: View {
             .frame(width: Layout.avatarSize, height: Layout.avatarSize)
             .clipShape(Circle())
             .overlay {
-                Circle()
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                Circle().strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
             }
-            .shadow(color: .black.opacity(0.45), radius: 12, x: 0, y: 4)
+            .shadow(color: .black.opacity(0.5), radius: 14, x: 0, y: 6)
     }
 
     // MARK: - Actions
@@ -137,31 +142,52 @@ struct IncomingCallView: View {
     }
 
     private var nativeButtonsLayout: some View {
-        VStack(spacing: 28) {
-            // Secondary row (like iOS "Remind Me" / "Message")
-            HStack(spacing: Layout.secondaryRowSpacing) {
-                secondaryAction(icon: "alarm.fill", label: "Me rappeler")
-                secondaryAction(icon: "message.fill", label: "Message")
-            }
-            .padding(.horizontal, 40)
+        GlassEffectContainer(spacing: 40) {
+            VStack(spacing: 32) {
+                // Decorative secondary row (iOS native call layout)
+                HStack(spacing: Layout.secondaryRowSpacing) {
+                    CallActionButton(
+                        systemImage: "alarm.fill",
+                        style: .secondary,
+                        size: .small,
+                        accessibilityLabel: "Me rappeler",
+                        title: "Me rappeler",
+                        action: {}
+                    )
+                    .glassEffectID("remind", in: glassNamespace)
 
-            // Primary row (decline + accept)
-            HStack(spacing: Layout.primaryRowSpacing) {
-                CallActionButton(
-                    systemImage: "phone.down.fill",
-                    style: .decline,
-                    accessibilityLabel: "Refuser l'appel",
-                    title: "Refuser",
-                    action: { appState.endCall() }
-                )
+                    CallActionButton(
+                        systemImage: "message.fill",
+                        style: .secondary,
+                        size: .small,
+                        accessibilityLabel: "Message",
+                        title: "Message",
+                        action: {}
+                    )
+                    .glassEffectID("message", in: glassNamespace)
+                }
+                .padding(.horizontal, 20)
 
-                CallActionButton(
-                    systemImage: "phone.fill",
-                    style: .accept,
-                    accessibilityLabel: "Accepter l'appel",
-                    title: "Accepter",
-                    action: { appState.answerCall() }
-                )
+                // Primary actions
+                HStack(spacing: Layout.primaryRowSpacing) {
+                    CallActionButton(
+                        systemImage: "phone.down.fill",
+                        style: .decline,
+                        accessibilityLabel: "Refuser l'appel",
+                        title: "Refuser",
+                        action: { appState.endCall() }
+                    )
+                    .glassEffectID("decline", in: glassNamespace)
+
+                    CallActionButton(
+                        systemImage: "phone.fill",
+                        style: .accept,
+                        accessibilityLabel: "Accepter l'appel",
+                        title: "Accepter",
+                        action: { appState.answerCall() }
+                    )
+                    .glassEffectID("accept", in: glassNamespace)
+                }
             }
         }
     }
@@ -174,31 +200,11 @@ struct IncomingCallView: View {
                 Text("Refuser")
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(.white.opacity(0.85))
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 10)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
         }
-    }
-
-    private func secondaryAction(icon: String, label: String) -> some View {
-        // Non-functional decorative buttons to match Apple's call layout.
-        // They visually ground the app as a "real" call screen.
-        VStack(spacing: 6) {
-            Circle()
-                .fill(.white.opacity(0.18))
-                .frame(width: 56, height: 56)
-                .overlay {
-                    Image(systemName: icon)
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.92))
-                }
-
-            Text(label)
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(.white.opacity(0.85))
-        }
-        .accessibilityHidden(true)
     }
 }
 

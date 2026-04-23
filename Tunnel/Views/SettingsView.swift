@@ -41,7 +41,6 @@ struct SettingsView: View {
             .onChange(of: appState.config.ringtoneName) { _, newValue in
                 previewPlayer.stop()
                 isPreviewing = false
-                previewPlayer.currentRingtoneName = newValue
             }
             .onDisappear {
                 previewPlayer.stop()
@@ -170,7 +169,9 @@ struct SettingsView: View {
         var names: Set<String> = []
 
         for ext in exts {
-            let urls = Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: "Sounds") ?? []
+            // Xcode flattens copied resources at the bundle root for this project,
+            // so we intentionally scan without a subdirectory.
+            let urls = Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: nil) ?? []
             for url in urls {
                 names.insert(url.deletingPathExtension().lastPathComponent)
             }
@@ -265,14 +266,13 @@ import AVFoundation
 private final class RingtonePreviewPlayer: NSObject, AVAudioPlayerDelegate {
     private var player: AVAudioPlayer?
     private var completion: (() -> Void)?
-    var currentRingtoneName: String = "default_ringtone"
 
     func play(ringtoneName: String, completion: @escaping () -> Void) {
         stop()
         self.completion = completion
 
         let exts = ["caf", "m4a", "wav", "mp3"]
-        let url = exts.compactMap { Bundle.main.url(forResource: ringtoneName, withExtension: $0, subdirectory: "Sounds") }.first
+        let url = exts.compactMap { Bundle.main.url(forResource: ringtoneName, withExtension: $0, subdirectory: nil) }.first
         guard let url else {
             completion()
             return

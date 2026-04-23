@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// iOS 26 Liquid Glass incoming call screen.
-/// Uses GlassEffectContainer for morphing glass elements + native glass buttons.
+/// Pixel-perfect iOS 26 incoming call screen using Liquid Glass.
 struct IncomingCallView: View {
     private enum Layout {
         static let avatarSize: CGFloat = 136
@@ -26,7 +25,7 @@ struct IncomingCallView: View {
                     .padding(.bottom, 24)
 
                 Text(appState.config.contactName)
-                    .font(.system(size: 34, weight: .semibold, design: .default))
+                    .font(.system(size: 34, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -54,7 +53,6 @@ struct IncomingCallView: View {
 
     private var backgroundLayer: some View {
         ZStack {
-            // Rich ambient gradient with depth (iOS 26 style)
             LinearGradient(
                 colors: [
                     Color(red: 0.09, green: 0.10, blue: 0.16),
@@ -66,12 +64,8 @@ struct IncomingCallView: View {
             )
             .ignoresSafeArea()
 
-            // Mesh-like color bloom behind avatar
             RadialGradient(
-                colors: [
-                    Color(red: 0.30, green: 0.34, blue: 0.50).opacity(0.45),
-                    .clear
-                ],
+                colors: [Color(red: 0.30, green: 0.34, blue: 0.50).opacity(0.45), .clear],
                 center: .init(x: 0.5, y: 0.22),
                 startRadius: 0,
                 endRadius: 420
@@ -79,12 +73,8 @@ struct IncomingCallView: View {
             .ignoresSafeArea()
             .blendMode(.screen)
 
-            // Subtle bottom warm glow
             RadialGradient(
-                colors: [
-                    Color(red: 0.18, green: 0.10, blue: 0.30).opacity(0.30),
-                    .clear
-                ],
+                colors: [Color(red: 0.18, green: 0.10, blue: 0.30).opacity(0.30), .clear],
                 center: .init(x: 0.5, y: 0.95),
                 startRadius: 0,
                 endRadius: 380
@@ -100,10 +90,15 @@ struct IncomingCallView: View {
     private var contactAvatar: some View {
         if let data = appState.config.contactImageData,
            let uiImage = UIImage(data: data) {
-            avatarImage(uiImage)
-        } else if let imageName = appState.config.contactImageName,
-                  let uiImage = UIImage(named: imageName) {
-            avatarImage(uiImage)
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: Layout.avatarSize, height: Layout.avatarSize)
+                .clipShape(Circle())
+                .overlay {
+                    Circle().strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.5), radius: 14, x: 0, y: 6)
         } else {
             ZStack {
                 Circle()
@@ -116,18 +111,6 @@ struct IncomingCallView: View {
                     .foregroundStyle(.white.opacity(0.85))
             }
         }
-    }
-
-    private func avatarImage(_ uiImage: UIImage) -> some View {
-        Image(uiImage: uiImage)
-            .resizable()
-            .scaledToFill()
-            .frame(width: Layout.avatarSize, height: Layout.avatarSize)
-            .clipShape(Circle())
-            .overlay {
-                Circle().strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.5), radius: 14, x: 0, y: 6)
     }
 
     // MARK: - Actions
@@ -144,7 +127,6 @@ struct IncomingCallView: View {
     private var nativeButtonsLayout: some View {
         GlassEffectContainer(spacing: 40) {
             VStack(spacing: 32) {
-                // Decorative secondary row (iOS native call layout)
                 HStack(spacing: Layout.secondaryRowSpacing) {
                     CallActionButton(
                         systemImage: "alarm.fill",
@@ -168,7 +150,6 @@ struct IncomingCallView: View {
                 }
                 .padding(.horizontal, 20)
 
-                // Primary actions
                 HStack(spacing: Layout.primaryRowSpacing) {
                     CallActionButton(
                         systemImage: "phone.down.fill",

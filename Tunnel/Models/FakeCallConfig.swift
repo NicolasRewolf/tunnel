@@ -1,5 +1,7 @@
 import Foundation
 
+/// Everything Tunnel needs to draw a convincing incoming call.
+/// Stored as JSON in UserDefaults via `Codable`.
 struct FakeCallConfig: Codable, Equatable {
     enum Defaults {
         static let contactName = "Contact"
@@ -14,7 +16,7 @@ struct FakeCallConfig: Codable, Equatable {
     var fakePhoneNumber: String = Defaults.fakePhoneNumber
     var ringtoneName: String = Defaults.ringtoneName
     var useSlideToAnswer: Bool = Defaults.useSlideToAnswer
-    var contactImageName: String?
+
     /// JPEG data of a custom contact photo picked by the user, resized for storage.
     var contactImageData: Data?
 }

@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Minimalist in-call screen: avatar, name, timer, and a single End button.
-/// No decorative grid — every element is functional.
+/// Minimalist in-call screen: avatar, name, timer, single End button.
 struct InCallView: View {
     private enum Layout {
         static let avatarSize: CGFloat = 92
@@ -106,21 +105,22 @@ struct InCallView: View {
     // MARK: - End button
 
     private var endCallButton: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            appState.endCall()
-        }) {
+        Button(action: endCall) {
             Image(systemName: "phone.down.fill")
                 .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: Layout.endButtonSize, height: Layout.endButtonSize)
-                .glassEffect(
-                    .regular.tint(Color(red: 0.97, green: 0.26, blue: 0.28)).interactive(),
-                    in: .circle
-                )
+                .glassEffect(.regular.tint(Theme.red).interactive(), in: .circle)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Raccrocher")
+    }
+
+    // MARK: - Private
+
+    private func endCall() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        appState.endCall()
     }
 
     private func durationLabel(for date: Date) -> String {

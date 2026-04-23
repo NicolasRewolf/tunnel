@@ -1,8 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// iOS 26 Liquid Glass call action button.
-/// Uses `.glassEffect()` with tinted colors and interactive feedback.
+/// Circular call action button styled with iOS 26 Liquid Glass.
 struct CallActionButton: View {
     enum Size {
         case regular
@@ -30,8 +29,8 @@ struct CallActionButton: View {
 
         var tint: Color? {
             switch self {
-            case .accept: return Color(red: 0.20, green: 0.78, blue: 0.35)
-            case .decline: return Color(red: 0.97, green: 0.26, blue: 0.28)
+            case .accept: return Theme.green
+            case .decline: return Theme.red
             case .secondary: return nil
             }
         }

@@ -20,12 +20,10 @@ struct SlideToAnswer: View {
             let progress = maxTravel == 0 ? 0 : knobOffset / maxTravel
 
             ZStack(alignment: .leading) {
-                // Glass track (Liquid Glass)
                 Capsule()
                     .fill(.clear)
                     .glassEffect(.regular, in: .capsule)
 
-                // Shimmering hint text
                 Text("glisser pour répondre")
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(.white)
@@ -48,13 +46,12 @@ struct SlideToAnswer: View {
                         }
                     }
 
-                // Glass knob with green tint
                 Image(systemName: "phone.fill")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: Layout.knobSize, height: Layout.knobSize)
                     .glassEffect(
-                        .regular.tint(Color(red: 0.20, green: 0.78, blue: 0.35)).interactive(),
+                        .regular.tint(Theme.green).interactive(),
                         in: .circle
                     )
                     .offset(x: knobOffset + Layout.padding)

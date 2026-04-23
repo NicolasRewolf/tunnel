@@ -3,7 +3,7 @@ import Foundation
 struct FakeCallConfig: Codable, Equatable {
     enum Defaults {
         static let contactName = "Contact"
-        static let contactSubtitle = "mobile"
+        static let contactSubtitle = "Portable"
         static let fakePhoneNumber = "+33 6 00 00 00 00"
         static let ringtoneName = "default_ringtone"
         static let useSlideToAnswer = false

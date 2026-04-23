@@ -2,28 +2,23 @@ import AVFoundation
 import AudioToolbox
 import OSLog
 
+/// Plays a bundled ringtone on a loop.
+/// Falls back to a repeated system alert sound if the bundled file can't be loaded.
 @MainActor
 final class RingtonePlayer: NSObject {
     private enum FallbackConstants {
         static let systemSoundID: SystemSoundID = 1003
         static let repeatInterval: TimeInterval = 2.2
     }
+
     private enum SupportedExtensions {
         static let all = ["caf", "m4a", "wav", "mp3"]
-    }
-    private enum SystemRingtone {
-        static let defaultName = "default_ringtone"
-        static let candidatePaths = [
-            "/System/Library/Audio/UISounds/Ringtones/Reflection.m4r",
-            "/System/Library/Audio/UISounds/Ringtones/Opening.m4r",
-            "/System/Library/Audio/UISounds/Ringtones/Sencha.m4r",
-            "/System/Library/Audio/UISounds/Ringtones/Default.m4r"
-        ]
     }
 
     private let logger = Logger(subsystem: "rewolf.Tunnel", category: "RingtonePlayer")
     private var player: AVAudioPlayer?
     private var fallbackTimer: Timer?
+
     override init() {
         super.init()
         registerInterruptionObserver()
@@ -32,15 +27,14 @@ final class RingtonePlayer: NSObject {
     func play(ringtoneName: String) {
         stop()
 
-        guard let url = preferredRingtoneURL(for: ringtoneName) else {
-            logger.error("Unable to find ringtone file: \(ringtoneName, privacy: .public) with supported extensions.")
+        guard let url = ringtoneURL(for: ringtoneName) else {
+            logger.error("Missing bundled ringtone file: \(ringtoneName, privacy: .public)")
             playFallbackSystemRingtone()
             return
         }
 
         do {
             try activateAudioSession()
-
             player = try AVAudioPlayer(contentsOf: url)
             player?.numberOfLoops = -1
             player?.prepareToPlay()
@@ -49,24 +43,6 @@ final class RingtonePlayer: NSObject {
             logger.error("Failed to play ringtone: \(error.localizedDescription, privacy: .public)")
             playFallbackSystemRingtone()
         }
-    }
-
-    private func preferredRingtoneURL(for ringtoneName: String) -> URL? {
-        if ringtoneName == SystemRingtone.defaultName,
-           let systemDefaultURL = systemDefaultRingtoneURL() {
-            return systemDefaultURL
-        }
-
-        return ringtoneURL(for: ringtoneName)
-    }
-
-    private func systemDefaultRingtoneURL() -> URL? {
-        let fileManager = FileManager.default
-        for path in SystemRingtone.candidatePaths where fileManager.fileExists(atPath: path) {
-            return URL(fileURLWithPath: path)
-        }
-
-        return nil
     }
 
     func stop() {
@@ -81,6 +57,17 @@ final class RingtonePlayer: NSObject {
         } catch {
             logger.error("Failed to deactivate audio session: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    // MARK: - Private
+
+    private func ringtoneURL(for ringtoneName: String) -> URL? {
+        for fileExtension in SupportedExtensions.all {
+            if let url = Bundle.main.url(forResource: ringtoneName, withExtension: fileExtension) {
+                return url
+            }
+        }
+        return nil
     }
 
     private func activateAudioSession() throws {
@@ -99,18 +86,7 @@ final class RingtonePlayer: NSObject {
         fallbackTimer?.tolerance = 0.15
     }
 
-    private func ringtoneURL(for ringtoneName: String) -> URL? {
-        for fileExtension in SupportedExtensions.all {
-            if let url = Bundle.main.url(forResource: ringtoneName, withExtension: fileExtension) {
-                return url
-            }
-        }
-
-        return nil
-    }
-
-    /// Resumes the ringtone after a system interruption (incoming notification, real call, etc.)
-    /// when the system tells us the interruption ended with `.shouldResume`.
+    /// Resumes the ringtone after a system interruption ends with `.shouldResume`.
     private func registerInterruptionObserver() {
         NotificationCenter.default.addObserver(
             self,
@@ -122,10 +98,6 @@ final class RingtonePlayer: NSObject {
 
     @objc
     private func handleAudioSessionInterruption(_ notification: Notification) {
-        handleInterruption(notification)
-    }
-
-    private func handleInterruption(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let typeRaw = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: typeRaw) else {
@@ -143,7 +115,7 @@ final class RingtonePlayer: NSObject {
                     try activateAudioSession()
                     player.play()
                 } catch {
-                    logger.error("Failed to resume ringtone after interruption: \(error.localizedDescription, privacy: .public)")
+                    logger.error("Failed to resume ringtone: \(error.localizedDescription, privacy: .public)")
                 }
             }
         @unknown default:

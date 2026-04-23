@@ -7,6 +7,7 @@ import UIKit
 struct SettingsView: View {
     @Bindable var appState: AppState
     @State private var photoSelection: PhotosPickerItem?
+    @State private var showPrivacyPolicy = false
     private let logger = Logger(subsystem: "rewolf.Tunnel", category: "SettingsView")
 
     private static let avatarSize: CGFloat = 60
@@ -81,6 +82,22 @@ struct SettingsView: View {
                         }
                     }
                     .foregroundStyle(.primary)
+
+                    Button {
+                        showPrivacyPolicy = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "lock.shield.fill")
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 24)
+                            Text("Confidentialité")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
                 }
 
                 Section {
@@ -88,9 +105,10 @@ struct SettingsView: View {
                         Text("Tunnel")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text("Aucune donnée ne quitte cet iPhone.")
+                        Text("Simulation locale. Aucune donnée ne quitte cet iPhone.")
                             .font(.system(size: 12))
                             .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
@@ -105,6 +123,9 @@ struct SettingsView: View {
                         appState.goHome()
                     }
                 }
+            }
+            .sheet(isPresented: $showPrivacyPolicy) {
+                PrivacyPolicyView()
             }
             .onChange(of: photoSelection) { _, newValue in
                 guard let newValue else { return }

@@ -1,19 +1,17 @@
 import SwiftUI
 
-/// iOS 26 Liquid Glass in-call screen.
-/// Uses GlassEffectContainer for the 2x3 controls grid + tinted glass End button.
+/// Minimalist in-call screen: avatar, name, timer, and a single End button.
+/// No decorative grid — every element is functional.
 struct InCallView: View {
     private enum Layout {
-        static let avatarSize: CGFloat = 72
-        static let topPadding: CGFloat = 64
-        static let bottomPadding: CGFloat = 48
+        static let avatarSize: CGFloat = 92
+        static let topPadding: CGFloat = 80
+        static let bottomPadding: CGFloat = 56
         static let endButtonSize: CGFloat = 74
-        static let gridSpacing: CGFloat = 28
     }
 
     let appState: AppState
     @State private var callStartDate = Date()
-    @Namespace private var glassNamespace
 
     var body: some View {
         ZStack {
@@ -24,10 +22,10 @@ struct InCallView: View {
                     .frame(height: Layout.topPadding)
 
                 contactAvatar
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 20)
 
                 Text(appState.config.contactName)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -36,17 +34,13 @@ struct InCallView: View {
 
                 TimelineView(.periodic(from: callStartDate, by: 1)) { timeline in
                     Text(durationLabel(for: timeline.date))
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.72))
                         .monospacedDigit()
                 }
-                .padding(.top, 4)
+                .padding(.top, 6)
 
                 Spacer()
-
-                controlsGrid
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 36)
 
                 endCallButton
                     .padding(.bottom, Layout.bottomPadding)
@@ -103,49 +97,13 @@ struct InCallView: View {
                     .frame(width: Layout.avatarSize, height: Layout.avatarSize)
 
                 Image(systemName: "person.fill")
-                    .font(.system(size: 34, weight: .regular))
+                    .font(.system(size: 42, weight: .regular))
                     .foregroundStyle(.white.opacity(0.85))
             }
         }
     }
 
-    // MARK: - Controls grid (Liquid Glass)
-
-    private var controlsGrid: some View {
-        GlassEffectContainer(spacing: 20) {
-            VStack(spacing: Layout.gridSpacing) {
-                HStack(spacing: Layout.gridSpacing) {
-                    controlButton(icon: "mic.slash.fill", label: "Silence", id: "mute")
-                    controlButton(icon: "square.grid.3x3.fill", label: "Clavier", id: "keypad")
-                    controlButton(icon: "speaker.wave.2.fill", label: "Haut-parleur", id: "speaker")
-                }
-                HStack(spacing: Layout.gridSpacing) {
-                    controlButton(icon: "plus", label: "Ajouter", id: "add")
-                    controlButton(icon: "video.fill", label: "FaceTime", id: "facetime")
-                    controlButton(icon: "person.crop.circle.fill", label: "Contacts", id: "contacts")
-                }
-            }
-        }
-    }
-
-    private func controlButton(icon: String, label: String, id: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .regular))
-                .foregroundStyle(.white)
-                .frame(width: 68, height: 68)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .glassEffectID(id, in: glassNamespace)
-
-            Text(label)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(.white.opacity(0.88))
-                .frame(minWidth: 80)
-        }
-        .accessibilityHidden(true)
-    }
-
-    // MARK: - End button (tinted Liquid Glass)
+    // MARK: - End button
 
     private var endCallButton: some View {
         Button(action: {

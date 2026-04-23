@@ -33,27 +33,32 @@ final class AppState {
     // MARK: - Call lifecycle
 
     func triggerFakeCallNow() {
-        guard screen != .incomingCall else { return }
-        setKeepScreenAwake(true)
-        screen = .incomingCall
-        startIncomingFeedback()
+        requestFakeCall()
     }
 
     /// Use this when the trigger happens while the app might not be active yet
     /// (lock screen, background, coming from another app).
     func requestFakeCall() {
+        // Avoid the "Home flashes first" effect on cold launch:
+        // move UI to the incoming call screen immediately, but only start audio/haptics
+        // when the scene is active.
+        if screen != .incomingCall {
+            setKeepScreenAwake(true)
+            screen = .incomingCall
+        }
+
         pendingTrigger = true
         if isSceneActive {
             pendingTrigger = false
-            triggerFakeCallNow()
+            startIncomingFeedback()
         }
     }
 
     func setSceneActive(_ active: Bool) {
         isSceneActive = active
-        if active, pendingTrigger {
+        if active, pendingTrigger, screen == .incomingCall {
             pendingTrigger = false
-            triggerFakeCallNow()
+            startIncomingFeedback()
         }
     }
 

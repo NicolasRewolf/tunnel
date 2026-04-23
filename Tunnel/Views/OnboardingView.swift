@@ -1,37 +1,21 @@
 import SwiftUI
 
-/// Onboarding explaining how to trigger a fake call discreetly — the core value of Tunnel.
-/// Surfaces the primary method (Back Tap) and a zero-setup alternative (Siri).
+/// Onboarding focused on discreet, silent, tactile triggers.
+/// No voice. No screen taps. Just physical gestures or pre-placed icons.
 struct OnboardingView: View {
     let appState: AppState
-
-    private let steps: [Step] = [
-        Step(
-            number: "1",
-            title: "Ouvre les Réglages iOS",
-            path: "Accessibilité › Toucher › Toucher au dos"
-        ),
-        Step(
-            number: "2",
-            title: "Choisis ton geste",
-            path: "Double toucher ou Triple toucher"
-        ),
-        Step(
-            number: "3",
-            title: "Associe Tunnel",
-            path: "Raccourci › Lancer un faux appel"
-        )
-    ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 24) {
                     header
-                    stepsCard
-                    siriAlternative
 
-                    Spacer(minLength: 32)
+                    primaryMethod
+                    secondaryMethod
+                    tertiaryMethod
+
+                    Spacer(minLength: 24)
 
                     actions
                 }
@@ -48,11 +32,12 @@ struct OnboardingView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Déclenche sans toucher ton iPhone")
+            Text("Déclenche sans toucher l'écran")
                 .font(.system(size: 32, weight: .bold))
                 .tracking(-0.5)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Text("Deux tapes à l'arrière de ton iPhone suffisent à lancer un faux appel — même dans ta poche, au milieu d'une conversation.")
+            Text("Associe Tunnel à un geste ou à un bouton pour lancer un faux appel en silence, même main dans la poche.")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -60,71 +45,52 @@ struct OnboardingView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Steps card
+    // MARK: - Method 1: Back Tap (featured)
 
-    private var stepsCard: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                stepRow(step)
-
-                if index < steps.count - 1 {
-                    Divider().padding(.leading, 60)
-                }
-            }
-        }
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: 16))
-        }
+    private var primaryMethod: some View {
+        MethodCard(
+            icon: "hand.tap.fill",
+            label: "Toucher au dos",
+            description: "Tapote 2 ou 3 fois l'arrière de ton iPhone. Le geste le plus invisible.",
+            steps: [
+                "Réglages › Accessibilité › Toucher › Toucher au dos",
+                "Double toucher ou Triple toucher",
+                "Raccourci › Lancer un faux appel"
+            ],
+            featured: true
+        )
     }
 
-    private func stepRow(_ step: Step) -> some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.15))
-                    .frame(width: 34, height: 34)
+    // MARK: - Method 2: Action Button
 
-                Text(step.number)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(step.title)
-                    .font(.system(size: 17, weight: .medium))
-
-                Text(step.path)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+    private var secondaryMethod: some View {
+        MethodCard(
+            icon: "button.horizontal.top.press.fill",
+            label: "Bouton Action",
+            description: "Sur iPhone 15 Pro et plus récent. Une seule pression du bouton latéral.",
+            steps: [
+                "Réglages › Bouton Action",
+                "Glisse jusqu'à Raccourci",
+                "Choisis Lancer un faux appel"
+            ],
+            featured: false
+        )
     }
 
-    // MARK: - Siri alternative
+    // MARK: - Method 3: Home Screen Shortcut
 
-    private var siriAlternative: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "mic.fill")
-                .font(.system(size: 15))
-                .foregroundStyle(Color.accentColor)
-                .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Ou par la voix")
-                    .font(.system(size: 15, weight: .semibold))
-
-                Text("Dis à Siri : « Lance Tunnel » ou « Tunnel appelle-moi ».")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
+    private var tertiaryMethod: some View {
+        MethodCard(
+            icon: "square.grid.2x2.fill",
+            label: "Icône raccourci",
+            description: "Place un bouton Tunnel sur ton écran d'accueil, déguisé en icône neutre.",
+            steps: [
+                "Ouvre l'app Raccourcis d'iOS",
+                "Crée un raccourci avec Lancer un faux appel",
+                "Partager › Ajouter à l'écran d'accueil"
+            ],
+            featured: false
+        )
     }
 
     // MARK: - Actions
@@ -151,13 +117,64 @@ struct OnboardingView: View {
             .padding(.vertical, 4)
         }
     }
+}
 
-    // MARK: - Model
+// MARK: - Method card
 
-    private struct Step {
-        let number: String
-        let title: String
-        let path: String
+private struct MethodCard: View {
+    let icon: String
+    let label: String
+    let description: String
+    let steps: [String]
+    let featured: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(featured ? Color.accentColor : Color.accentColor.opacity(0.15))
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(featured ? .white : Color.accentColor)
+                }
+
+                Text(label)
+                    .font(.system(size: 17, weight: .semibold))
+
+                Spacer()
+            }
+
+            Text(description)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 18, height: 18)
+                            .background(Color.accentColor.opacity(0.12), in: .circle)
+
+                        Text(step)
+                            .font(.system(size: 14))
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        }
     }
 }
 

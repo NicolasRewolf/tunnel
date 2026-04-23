@@ -74,7 +74,7 @@ struct SettingsView: View {
                             Image(systemName: "hand.tap.fill")
                                 .foregroundStyle(Color.accentColor)
                                 .frame(width: 24)
-                            Text("Guide Back Tap")
+                            Text("Déclenchement discret")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 13, weight: .semibold))

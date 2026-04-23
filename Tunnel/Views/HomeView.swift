@@ -54,7 +54,7 @@ struct HomeView: View {
                     Button {
                         appState.openOnboarding()
                     } label: {
-                        Label("Back Tap", systemImage: "hand.tap.fill")
+                        Label("Raccourcis", systemImage: "hand.tap.fill")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 4)
                     }

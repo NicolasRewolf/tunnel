@@ -55,7 +55,7 @@ struct OnboardingView: View {
             steps: [
                 "Réglages › Accessibilité › Toucher › Toucher au dos",
                 "Double toucher ou Triple toucher",
-                "Raccourci › Lancer un faux appel"
+                "Raccourci › Déclencher Tunnel"
             ],
             featured: true
         )
@@ -71,7 +71,7 @@ struct OnboardingView: View {
             steps: [
                 "Réglages › Bouton Action",
                 "Glisse jusqu'à Raccourci",
-                "Choisis Lancer un faux appel"
+                "Choisis Déclencher Tunnel"
             ],
             featured: false
         )
@@ -86,7 +86,7 @@ struct OnboardingView: View {
             description: "Place un bouton Tunnel sur ton écran d'accueil, déguisé en icône neutre.",
             steps: [
                 "Ouvre l'app Raccourcis d'iOS",
-                "Crée un raccourci avec Lancer un faux appel",
+                "Crée un raccourci avec Déclencher Tunnel",
                 "Partager › Ajouter à l'écran d'accueil"
             ],
             featured: false

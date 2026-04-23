@@ -4,12 +4,12 @@ import AppIntents
 /// Appears in:
 ///   - iOS Shortcuts app
 ///   - Back Tap (Réglages › Accessibilité › Toucher › Toucher au dos › Raccourci)
-///   - Siri voice queries ("Dis Siri, lance Tunnel")
-///   - Spotlight / Action button (iPhone 15 Pro+)
+///   - Action Button (iPhone 15 Pro+)
+///   - Spotlight
 struct TriggerTunnelIntent: AppIntent {
-    static var title: LocalizedStringResource = "Lancer un faux appel"
+    static var title: LocalizedStringResource = "Déclencher Tunnel"
     static var description = IntentDescription(
-        "Déclenche immédiatement un faux appel entrant dans Tunnel."
+        "Lance immédiatement un faux appel entrant."
     )
     static var openAppWhenRun: Bool = true
 

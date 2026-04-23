@@ -34,7 +34,7 @@ struct HomeView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "phone.fill")
                             .font(.system(size: 17, weight: .semibold))
-                        Text("Lancer un faux appel")
+                        Text("Sortir du tunnel")
                             .font(.system(size: 17, weight: .semibold))
                     }
                     .frame(maxWidth: .infinity)

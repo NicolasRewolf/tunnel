@@ -7,10 +7,15 @@ struct InCallView: View {
         static let topPadding: CGFloat = 80
         static let bottomPadding: CGFloat = 56
         static let endButtonSize: CGFloat = 74
+        static let controlsHorizontalPadding: CGFloat = 34
+        static let controlsRowSpacing: CGFloat = 26
+        static let controlsColumnSpacing: CGFloat = 22
     }
 
     let appState: AppState
     @State private var callStartDate = Date()
+    @State private var isMuted = false
+    @State private var isSpeakerOn = false
 
     var body: some View {
         ZStack {
@@ -40,6 +45,10 @@ struct InCallView: View {
                 .padding(.top, 6)
 
                 Spacer()
+
+                controlsGrid
+                    .padding(.horizontal, Layout.controlsHorizontalPadding)
+                    .padding(.bottom, 44)
 
                 endCallButton
                     .padding(.bottom, Layout.bottomPadding)
@@ -116,6 +125,65 @@ struct InCallView: View {
         .accessibilityLabel("Raccrocher")
     }
 
+    // MARK: - Controls
+
+    private var controlsGrid: some View {
+        VStack(spacing: Layout.controlsRowSpacing) {
+            HStack(spacing: Layout.controlsColumnSpacing) {
+                InCallControlButton(
+                    title: "Muet",
+                    systemImage: isMuted ? "mic.slash.fill" : "mic.slash",
+                    isActive: isMuted,
+                    activeTint: .white
+                ) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    isMuted.toggle()
+                }
+
+                InCallControlButton(
+                    title: "Clavier",
+                    systemImage: "circle.grid.3x3.fill"
+                ) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+
+                InCallControlButton(
+                    title: "Audio",
+                    systemImage: isSpeakerOn ? "speaker.wave.3.fill" : "speaker.wave.2.fill",
+                    isActive: isSpeakerOn,
+                    activeTint: Theme.green
+                ) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    isSpeakerOn.toggle()
+                }
+            }
+
+            HStack(spacing: Layout.controlsColumnSpacing) {
+                InCallControlButton(
+                    title: "Ajouter",
+                    systemImage: "plus"
+                ) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+
+                InCallControlButton(
+                    title: "FaceTime",
+                    systemImage: "video.fill"
+                ) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+
+                InCallControlButton(
+                    title: "Contacts",
+                    systemImage: "person.crop.circle"
+                ) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
     // MARK: - Private
 
     private func endCall() {
@@ -130,6 +198,50 @@ struct InCallView: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 }
+
+#if canImport(UIKit)
+private struct InCallControlButton: View {
+    let title: String
+    let systemImage: String
+    var isActive: Bool = false
+    var activeTint: Color = .white
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(isActive ? activeTint : .white)
+                    .frame(width: 56, height: 56)
+                    .modifier(GlassControlModifier(isActive: isActive, activeTint: activeTint))
+
+                Text(title)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+}
+
+private struct GlassControlModifier: ViewModifier {
+    let isActive: Bool
+    let activeTint: Color
+
+    func body(content: Content) -> some View {
+        if isActive {
+            content.glassEffect(.regular.tint(activeTint.opacity(0.35)).interactive(), in: .circle)
+        } else {
+            content.glassEffect(.regular.interactive(), in: .circle)
+        }
+    }
+}
+#endif
 
 #Preview {
     InCallView(appState: AppState.shared)

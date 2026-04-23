@@ -15,7 +15,7 @@ struct TriggerTunnelIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppState.shared.triggerFakeCallNow()
+        AppState.shared.requestFakeCall()
         return .result()
     }
 }

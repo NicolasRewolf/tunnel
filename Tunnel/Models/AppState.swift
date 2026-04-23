@@ -23,6 +23,8 @@ final class AppState {
     private let ringtonePlayer = RingtonePlayer()
     private let hapticsManager = HapticsManager()
     private var isIncomingFeedbackActive = false
+    private var pendingTrigger = false
+    private var isSceneActive = true
 
     private init() {
         config = Self.loadConfig()
@@ -35,6 +37,24 @@ final class AppState {
         setKeepScreenAwake(true)
         screen = .incomingCall
         startIncomingFeedback()
+    }
+
+    /// Use this when the trigger happens while the app might not be active yet
+    /// (lock screen, background, coming from another app).
+    func requestFakeCall() {
+        pendingTrigger = true
+        if isSceneActive {
+            pendingTrigger = false
+            triggerFakeCallNow()
+        }
+    }
+
+    func setSceneActive(_ active: Bool) {
+        isSceneActive = active
+        if active, pendingTrigger {
+            pendingTrigger = false
+            triggerFakeCallNow()
+        }
     }
 
     func answerCall() {

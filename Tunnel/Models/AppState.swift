@@ -6,8 +6,8 @@ import UIKit
 @Observable
 final class AppState {
     enum Screen {
-        case onboarding
         case home
+        case onboarding
         case incomingCall
         case inCall
         case settings
@@ -22,13 +22,10 @@ final class AppState {
 
     private let ringtonePlayer = RingtonePlayer()
     private let hapticsManager = HapticsManager()
-    private var hasSeenOnboarding: Bool
     private var isIncomingFeedbackActive = false
 
     private init() {
         config = Self.loadConfig()
-        hasSeenOnboarding = UserDefaults.standard.bool(forKey: StorageKeys.hasSeenOnboarding)
-        screen = hasSeenOnboarding ? .home : .onboarding
     }
 
     // MARK: - Call lifecycle
@@ -72,17 +69,6 @@ final class AppState {
         screen = .onboarding
     }
 
-    func completeOnboarding() {
-        hasSeenOnboarding = true
-        UserDefaults.standard.set(true, forKey: StorageKeys.hasSeenOnboarding)
-        screen = .home
-    }
-
-    func dismissOnboarding() {
-        // Skip without marking as seen, so the user is reminded next launch.
-        screen = .home
-    }
-
     // MARK: - Feedback (audio + haptics)
 
     private func startIncomingFeedback() {
@@ -122,6 +108,5 @@ final class AppState {
 }
 
 private enum StorageKeys {
-    static let hasSeenOnboarding = "app.hasSeenOnboarding"
     static let config = "app.config"
 }

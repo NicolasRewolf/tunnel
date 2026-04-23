@@ -96,26 +96,17 @@ struct OnboardingView: View {
     // MARK: - Actions
 
     private var actions: some View {
-        VStack(spacing: 10) {
-            Button {
-                appState.completeOnboarding()
-            } label: {
-                Text("C'est prêt")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.extraLarge)
-            .tint(Color.accentColor)
-
-            Button("Plus tard") {
-                appState.dismissOnboarding()
-            }
-            .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.vertical, 4)
+        Button {
+            appState.goHome()
+        } label: {
+            Text("C'est prêt")
+                .font(.system(size: 17, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
         }
+        .buttonStyle(.glassProminent)
+        .controlSize(.extraLarge)
+        .tint(Color.accentColor)
     }
 }
 

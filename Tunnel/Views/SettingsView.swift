@@ -3,13 +3,11 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
-/// Native iOS Form layout with contact editing, appearance toggle, and in-app privacy.
+/// Native iOS Form layout with contact editing and in-app privacy.
 struct SettingsView: View {
     @Bindable var appState: AppState
     @State private var photoSelection: PhotosPickerItem?
     @State private var showPrivacyPolicy = false
-    @State private var previewPlayer = RingtonePreviewPlayer()
-    @State private var isPreviewing = false
     private let logger = Logger(subsystem: "rewolf.Tunnel", category: "SettingsView")
 
     private static let avatarSize: CGFloat = 60
@@ -19,8 +17,6 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 contactSection
-                appearanceSection
-                ringtoneSection
                 helpSection
                 footerSection
             }
@@ -29,6 +25,7 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Fermer") { appState.goHome() }
+                        .accessibilityLabel("Fermer les réglages")
                 }
             }
             .sheet(isPresented: $showPrivacyPolicy) {
@@ -37,13 +34,6 @@ struct SettingsView: View {
             .onChange(of: photoSelection) { _, newValue in
                 guard let newValue else { return }
                 Task { await loadPickedPhoto(newValue) }
-            }
-            .onChange(of: appState.config.ringtoneName) { _, newValue in
-                previewPlayer.stop()
-                isPreviewing = false
-            }
-            .onDisappear {
-                previewPlayer.stop()
             }
         }
     }
@@ -63,15 +53,17 @@ struct SettingsView: View {
                         photoLibrary: .shared()
                     ) {
                         Text(pickerLabel)
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.subheadline.weight(.medium))
                     }
+                    .accessibilityLabel(pickerLabel + " du contact")
 
                     if appState.config.contactImageData != nil {
                         Button("Retirer", role: .destructive) {
                             photoSelection = nil
                             appState.config.contactImageData = nil
                         }
-                        .font(.system(size: 13))
+                        .font(.footnote)
+                        .accessibilityLabel("Retirer la photo du contact")
                     }
                 }
 
@@ -91,49 +83,6 @@ struct SettingsView: View {
         }
     }
 
-    private var appearanceSection: some View {
-        Section {
-            Toggle("Glisser pour répondre", isOn: $appState.config.useSlideToAnswer)
-        } header: {
-            Text("Apparence de l'appel")
-        } footer: {
-            Text("Active pour reproduire l'écran verrouillé d'iPhone.")
-        }
-    }
-
-    private var ringtoneSection: some View {
-        Section {
-            Picker("Sonnerie", selection: $appState.config.ringtoneName) {
-                ForEach(Self.availableRingtoneNames, id: \.self) { ringtoneName in
-                    Text(Self.displayName(for: ringtoneName)).tag(ringtoneName)
-                }
-            }
-
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                if isPreviewing {
-                    previewPlayer.stop()
-                    isPreviewing = false
-                } else {
-                    previewPlayer.play(ringtoneName: appState.config.ringtoneName) {
-                        Task { @MainActor in
-                            isPreviewing = false
-                        }
-                        logger.debug("Ringtone preview ended.")
-                    }
-                    isPreviewing = true
-                }
-            } label: {
-                Label(isPreviewing ? "Stop" : "Écouter", systemImage: isPreviewing ? "stop.fill" : "play.fill")
-            }
-            .disabled(Self.availableRingtoneNames.isEmpty)
-        } header: {
-            Text("Sonnerie")
-        } footer: {
-            Text("Choisis la sonnerie utilisée pour l'appel entrant.")
-        }
-    }
-
     private var helpSection: some View {
         Section {
             navigationRow(icon: "hand.tap.fill", label: "Déclenchement discret") {
@@ -149,10 +98,10 @@ struct SettingsView: View {
         Section {
             VStack(alignment: .center, spacing: 4) {
                 Text("Tunnel")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(.secondary)
                 Text("Simulation locale. Aucune donnée ne quitte cet iPhone.")
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
             }
@@ -163,35 +112,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
-
-    private static var availableRingtoneNames: [String] {
-        let exts = ["caf", "m4a", "wav", "mp3"]
-        var names: Set<String> = []
-
-        for ext in exts {
-            // Xcode flattens copied resources at the bundle root for this project,
-            // so we intentionally scan without a subdirectory.
-            let urls = Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: nil) ?? []
-            for url in urls {
-                names.insert(url.deletingPathExtension().lastPathComponent)
-            }
-        }
-
-        let sorted = names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-        if sorted.contains("default_ringtone") {
-            return ["default_ringtone"] + sorted.filter { $0 != "default_ringtone" }
-        }
-        return sorted
-    }
-
-    private static func displayName(for ringtoneName: String) -> String {
-        if ringtoneName == "default_ringtone" { return "Par défaut" }
-        var name = ringtoneName
-        name = name.replacingOccurrences(of: "Tunnel - Ring Tone ", with: "")
-        name = name.replacingOccurrences(of: "_", with: " ")
-        name = name.replacingOccurrences(of: "-", with: "–")
-        return name.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     private func navigationRow(
         icon: String,
@@ -211,6 +131,8 @@ struct SettingsView: View {
             }
         }
         .foregroundStyle(.primary)
+        .accessibilityLabel(label)
+        .accessibilityHint("Ouvre la page \(label)")
     }
 
     @ViewBuilder
@@ -258,58 +180,6 @@ struct SettingsView: View {
         }
     }
 }
-
-#if canImport(AVFoundation)
-import AVFoundation
-
-@MainActor
-private final class RingtonePreviewPlayer: NSObject, AVAudioPlayerDelegate {
-    private var player: AVAudioPlayer?
-    private var completion: (() -> Void)?
-
-    func play(ringtoneName: String, completion: @escaping () -> Void) {
-        stop()
-        self.completion = completion
-
-        let exts = ["caf", "m4a", "wav", "mp3"]
-        let url = exts.compactMap { Bundle.main.url(forResource: ringtoneName, withExtension: $0, subdirectory: nil) }.first
-        guard let url else {
-            completion()
-            return
-        }
-
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default)
-            try session.setActive(true)
-
-            let p = try AVAudioPlayer(contentsOf: url)
-            p.delegate = self
-            p.numberOfLoops = 0
-            p.prepareToPlay()
-            p.play()
-            player = p
-        } catch {
-            completion()
-        }
-    }
-
-    func stop() {
-        player?.stop()
-        player = nil
-        completion = nil
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
-        } catch {}
-    }
-
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        let completion = completion
-        stop()
-        completion?()
-    }
-}
-#endif
 
 #Preview {
     SettingsView(appState: AppState.shared)

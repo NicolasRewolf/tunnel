@@ -1,15 +1,22 @@
 import SwiftUI
+import UIKit
 
-/// Minimalist in-call screen: avatar, name, timer, single End button.
+/// Pixel-clone of iOS 26 Phone.app in-call UI.
+/// Rendered after CallKit hands off control (user tapped Accept).
+///
+/// Goal: visually indistinguishable from the System In-Call UI that iOS draws
+/// automatically when the app is not foregrounded (i.e. locked device case).
+/// This way the transition CallKit → app is invisible to the user.
 struct InCallView: View {
     private enum Layout {
-        static let avatarSize: CGFloat = 92
-        static let topPadding: CGFloat = 80
-        static let bottomPadding: CGFloat = 56
-        static let endButtonSize: CGFloat = 74
-        static let controlsHorizontalPadding: CGFloat = 34
-        static let controlsRowSpacing: CGFloat = 26
-        static let controlsColumnSpacing: CGFloat = 22
+        static let avatarSize: CGFloat = 108
+        static let topPadding: CGFloat = 72
+        static let bottomPadding: CGFloat = 44
+        static let endButtonSize: CGFloat = 76
+        static let controlButtonSize: CGFloat = 72
+        static let controlsHorizontalPadding: CGFloat = 32
+        static let controlsRowSpacing: CGFloat = 22
+        static let controlsColumnSpacing: CGFloat = 16
     }
 
     let appState: AppState
@@ -19,70 +26,43 @@ struct InCallView: View {
 
     var body: some View {
         ZStack {
-            backgroundLayer
+            Color.black
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                Spacer()
-                    .frame(height: Layout.topPadding)
+                Spacer().frame(height: Layout.topPadding)
 
                 contactAvatar
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 18)
 
                 Text(appState.config.contactName)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.horizontal, 24)
-                    .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 1)
 
                 TimelineView(.periodic(from: callStartDate, by: 1)) { timeline in
                     Text(durationLabel(for: timeline.date))
                         .font(.system(size: 17, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(.white.opacity(0.85))
                         .monospacedDigit()
                 }
-                .padding(.top, 6)
+                .padding(.top, 4)
 
                 Spacer()
 
                 controlsGrid
                     .padding(.horizontal, Layout.controlsHorizontalPadding)
-                    .padding(.bottom, 44)
+                    .padding(.bottom, 32)
 
                 endCallButton
                     .padding(.bottom, Layout.bottomPadding)
             }
         }
-        .statusBarHidden(true)
+        .statusBarHidden(false)
         .preferredColorScheme(.dark)
         .onAppear { callStartDate = Date() }
-    }
-
-    // MARK: - Background
-
-    private var backgroundLayer: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.07, green: 0.08, blue: 0.12),
-                    Color(red: 0.04, green: 0.06, blue: 0.10),
-                    Color(red: 0.02, green: 0.03, blue: 0.06)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [Color(red: 0.20, green: 0.26, blue: 0.40).opacity(0.25), .clear],
-                center: .init(x: 0.5, y: 0.35),
-                startRadius: 0,
-                endRadius: 360
-            )
-            .ignoresSafeArea()
-            .blendMode(.screen)
-        }
     }
 
     // MARK: - Avatar
@@ -96,16 +76,14 @@ struct InCallView: View {
                 .scaledToFill()
                 .frame(width: Layout.avatarSize, height: Layout.avatarSize)
                 .clipShape(Circle())
-                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 2)
         } else {
             ZStack {
                 Circle()
-                    .fill(.white.opacity(0.08))
-                    .glassEffect(.regular, in: .circle)
+                    .fill(Color(white: 0.22))
                     .frame(width: Layout.avatarSize, height: Layout.avatarSize)
 
                 Image(systemName: "person.fill")
-                    .font(.system(size: 42, weight: .regular))
+                    .font(.system(size: 52, weight: .regular))
                     .foregroundStyle(.white.opacity(0.85))
             }
         }
@@ -119,7 +97,7 @@ struct InCallView: View {
                 .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: Layout.endButtonSize, height: Layout.endButtonSize)
-                .glassEffect(.regular.tint(Theme.red).interactive(), in: .circle)
+                .background(Circle().fill(Theme.red))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Raccrocher")
@@ -132,9 +110,9 @@ struct InCallView: View {
             HStack(spacing: Layout.controlsColumnSpacing) {
                 InCallControlButton(
                     title: "Muet",
-                    systemImage: isMuted ? "mic.slash.fill" : "mic.slash",
-                    isActive: isMuted,
-                    activeTint: .white
+                    systemImage: "mic.slash.fill",
+                    size: Layout.controlButtonSize,
+                    isActive: isMuted
                 ) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     isMuted.toggle()
@@ -142,7 +120,8 @@ struct InCallView: View {
 
                 InCallControlButton(
                     title: "Clavier",
-                    systemImage: "circle.grid.3x3.fill"
+                    systemImage: "circle.grid.3x3.fill",
+                    size: Layout.controlButtonSize
                 ) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
@@ -150,8 +129,8 @@ struct InCallView: View {
                 InCallControlButton(
                     title: "Audio",
                     systemImage: isSpeakerOn ? "speaker.wave.3.fill" : "speaker.wave.2.fill",
-                    isActive: isSpeakerOn,
-                    activeTint: Theme.green
+                    size: Layout.controlButtonSize,
+                    isActive: isSpeakerOn
                 ) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     isSpeakerOn.toggle()
@@ -161,21 +140,24 @@ struct InCallView: View {
             HStack(spacing: Layout.controlsColumnSpacing) {
                 InCallControlButton(
                     title: "Ajouter",
-                    systemImage: "plus"
+                    systemImage: "plus",
+                    size: Layout.controlButtonSize
                 ) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
 
                 InCallControlButton(
                     title: "FaceTime",
-                    systemImage: "video.fill"
+                    systemImage: "video.fill",
+                    size: Layout.controlButtonSize
                 ) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
 
                 InCallControlButton(
                     title: "Contacts",
-                    systemImage: "person.crop.circle"
+                    systemImage: "person.crop.circle",
+                    size: Layout.controlButtonSize
                 ) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
@@ -199,26 +181,29 @@ struct InCallView: View {
     }
 }
 
-#if canImport(UIKit)
+// MARK: - Control Button
+
 private struct InCallControlButton: View {
     let title: String
     let systemImage: String
+    let size: CGFloat
     var isActive: Bool = false
-    var activeTint: Color = .white
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(isActive ? activeTint : .white)
-                    .frame(width: 56, height: 56)
-                    .modifier(GlassControlModifier(isActive: isActive, activeTint: activeTint))
+                    .font(.system(size: 26, weight: .regular))
+                    .foregroundStyle(isActive ? Color.black : .white)
+                    .frame(width: size, height: size)
+                    .background(
+                        Circle().fill(isActive ? Color.white : Color(white: 0.22))
+                    )
 
                 Text(title)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.78))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -226,22 +211,9 @@ private struct InCallControlButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
-
-private struct GlassControlModifier: ViewModifier {
-    let isActive: Bool
-    let activeTint: Color
-
-    func body(content: Content) -> some View {
-        if isActive {
-            content.glassEffect(.regular.tint(activeTint.opacity(0.35)).interactive(), in: .circle)
-        } else {
-            content.glassEffect(.regular.interactive(), in: .circle)
-        }
-    }
-}
-#endif
 
 #Preview {
     InCallView(appState: AppState.shared)

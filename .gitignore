@@ -1,0 +1,40 @@
+# ─── macOS ────────────────────────────────────────────────
+.DS_Store
+._*
+
+# ─── Xcode / Swift ────────────────────────────────────────
+## Per-user Xcode state
+**/xcuserdata/
+*.xcuserstate
+
+## Build outputs
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcarchive
+*.hmap
+
+## Swift Package Manager
+.swiftpm/
+.build/
+Packages/
+Package.resolved
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# ─── Design sources (heavy binaries) ──────────────────────
+## Photoshop working files >100MB are rejected by GitHub
+Ressources/Image/*.psd
+Ressources/Image/*.psb
+
+## Ableton project folder + analysis/cache files
+Ressources/Ringtones/RING TONES Project/
+*.asd
+
+# ─── Adobe / temp files ───────────────────────────────────
+~*.tmp
+*.tmp

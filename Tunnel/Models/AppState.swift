@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 import UIKit
 
 @MainActor
@@ -8,107 +9,89 @@ final class AppState {
     enum Screen {
         case home
         case onboarding
-        case incomingCall
         case inCall
         case settings
     }
 
     static let shared = AppState()
 
+    private let logger = Logger(subsystem: "rewolf.Tunnel", category: "AppState")
+
     var screen: Screen = .home
     var config: FakeCallConfig {
         didSet { persistConfig() }
     }
 
-    private let ringtonePlayer = RingtonePlayer()
-    private let hapticsManager = HapticsManager()
-    private var isIncomingFeedbackActive = false
-    private var pendingTrigger = false
-    private var isSceneActive = true
+    /// Last user-facing error from a trigger attempt (e.g. CallKit refused the
+    /// call, daemon unavailable). Cleared by the view after it's been shown,
+    /// or at the start of a new trigger.
+    var lastTriggerError: String?
 
     private init() {
         config = Self.loadConfig()
     }
 
-    // MARK: - Call lifecycle
+    // MARK: - Call lifecycle (CallKit-backed)
 
+    /// Called by HomeView's "Sortir du tunnel" button.
+    /// Delegates to CallKit so the incoming-call UI is consistent with the
+    /// Back Tap / Action Button / Shortcut paths.
     func triggerFakeCallNow() {
-        requestFakeCall()
-    }
-
-    /// Use this when the trigger happens while the app might not be active yet
-    /// (lock screen, background, coming from another app).
-    func requestFakeCall() {
-        // Avoid the "Home flashes first" effect on cold launch:
-        // move UI to the incoming call screen immediately, but only start audio/haptics
-        // when the scene is active.
-        if screen != .incomingCall {
-            setKeepScreenAwake(true)
-            screen = .incomingCall
-        }
-
-        pendingTrigger = true
-        if isSceneActive {
-            pendingTrigger = false
-            startIncomingFeedback()
+        lastTriggerError = nil
+        Task { [logger, config, weak self] in
+            do {
+                try await CallKitManager.shared.reportIncomingCall(
+                    contactName: config.contactName
+                )
+            } catch {
+                logger.error(
+                    "triggerFakeCallNow failed: \(error.localizedDescription, privacy: .public) (\(String(describing: error), privacy: .public))"
+                )
+                self?.lastTriggerError = CallKitManager.userFacingMessage(for: error)
+            }
         }
     }
 
-    func setSceneActive(_ active: Bool) {
-        isSceneActive = active
-        if active, pendingTrigger, screen == .incomingCall {
-            pendingTrigger = false
-            startIncomingFeedback()
-        }
+    /// Called by InCallView's "Raccrocher" button.
+    /// Asks CallKit to end the call; `didEndCallKit()` will flip the screen
+    /// once `CXEndCallAction` is fulfilled by the delegate.
+    func endCall() {
+        CallKitManager.shared.endActiveCall()
     }
 
-    func answerCall() {
-        guard screen == .incomingCall else { return }
-        stopIncomingFeedback()
+    // MARK: - CallKit callbacks
+
+    /// Invoked by `CallKitManager` after the user accepts the incoming call.
+    func didAnswerCallKit() {
+        setKeepScreenAwake(true)
         screen = .inCall
     }
 
-    func endCall() {
-        stopIncomingFeedback()
+    /// Invoked by `CallKitManager` after the user declines or hangs up,
+    /// or after `providerDidReset`.
+    func didEndCallKit() {
         setKeepScreenAwake(false)
-        screen = .home
+        if screen == .inCall { screen = .home }
     }
 
     // MARK: - Navigation
 
     func goHome() {
-        stopIncomingFeedback()
         setKeepScreenAwake(false)
         screen = .home
     }
 
     func openSettings() {
-        stopIncomingFeedback()
         setKeepScreenAwake(false)
         screen = .settings
     }
 
     func openOnboarding() {
-        stopIncomingFeedback()
         setKeepScreenAwake(false)
         screen = .onboarding
     }
 
-    // MARK: - Feedback (audio + haptics)
-
-    private func startIncomingFeedback() {
-        guard !isIncomingFeedbackActive else { return }
-        isIncomingFeedbackActive = true
-        ringtonePlayer.play(ringtoneName: config.ringtoneName)
-        hapticsManager.startIncomingCallPattern()
-    }
-
-    private func stopIncomingFeedback() {
-        guard isIncomingFeedbackActive else { return }
-        isIncomingFeedbackActive = false
-        ringtonePlayer.stop()
-        hapticsManager.stop()
-    }
+    // MARK: - Private
 
     private func setKeepScreenAwake(_ enabled: Bool) {
         UIApplication.shared.isIdleTimerDisabled = enabled

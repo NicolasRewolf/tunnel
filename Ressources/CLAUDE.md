@@ -1,26 +1,28 @@
 # CLAUDE.md — Tunnel iOS App
 
-> Brief complet pour le développement de l'app **Tunnel**. À lire avant TOUTE action sur le code.
+> Brief complet pour le développement de l'app **Tunnel** (nom App Store : **Untunnel**).
+> À lire avant TOUTE action sur le code.
 
 ---
 
 ## 1. Produit
 
 ### Nom
-**Tunnel** — clin d'œil au "tunnel conversationnel" dont l'app permet de s'extraire.
+**Tunnel** (code) / **Untunnel** (App Store) — clin d'œil au "tunnel conversationnel" dont l'app permet de s'extraire.
 
 ### Pitch
 App iPhone qui déclenche un **faux appel entrant** à la demande, pour s'extraire poliment d'une conversation tunnel (collègue relou, oncle bavard, rendez-vous qui s'éternise).
 
 ### User story principale
 1. L'utilisateur est piégé dans une conversation.
-2. Il tapote discrètement l'arrière de son iPhone (geste **Back Tap** natif iOS).
-3. Le téléphone sonne comme pour un vrai appel entrant, avec nom, photo, et son système.
-4. L'utilisateur "décroche", s'éloigne, s'excuse, et se sauve.
+2. Il tapote discrètement l'arrière de son iPhone (geste **Back Tap** natif iOS) — **OU** appuie sur l'Action Button (iPhone 15 Pro+), **OU** lance un Raccourci Siri.
+3. Le téléphone sonne comme un vrai appel entrant, **même écran verrouillé**, avec le nom configuré, la sonnerie système, et vibration.
+4. L'utilisateur décroche (Face ID), s'éloigne, s'excuse, et se sauve.
 
 ### Ton produit
 - Humour assumé, zéro culpabilisation.
-- L'app doit être **crédible visuellement** (sinon ça ne marche pas) mais rester **transparente** dans sa description App Store (app de prank, pas d'usurpation).
+- Positionnement App Store = **outil social** ("sortir d'une conversation en un geste"), pas "prank / trick / fool".
+- L'app doit rester **transparente** : aucune capacité à tromper un tiers (impossible d'imiter un vrai numéro).
 
 ---
 
@@ -29,24 +31,23 @@ App iPhone qui déclenche un **faux appel entrant** à la demande, pour s'extrai
 | Élément | Choix | Raison |
 |---|---|---|
 | Langage | Swift 5.9+ | Natif Apple |
-| UI | SwiftUI | Moderne, concis, idéal pour IA |
-| iOS cible | **iOS 17+** | Accès à App Intents, Observation framework |
-| Architecture | MVVM léger | Simple pour une app de cette taille |
+| UI | SwiftUI | Moderne, concis |
+| iOS cible | **iOS 17+** | App Intents, Observation framework |
+| Architecture | MVVM léger, compartimentation stricte du CallKit | Simple, testable |
 | Dépendances externes | **Zéro** | Tout en natif Apple |
-| Persistance | `@AppStorage` / UserDefaults | Config simple, pas besoin de CoreData |
+| Persistance | `UserDefaults` via `Codable` | Config simple, pas de CoreData |
 
 ### Frameworks utilisés
-- `SwiftUI` — toute l'UI
-- `AppIntents` — pour le déclenchement via Raccourcis/Back Tap
-- `AVFoundation` — lecture du son de sonnerie
-- `CoreHaptics` — vibrations réalistes
-- `UIKit` (minimal) — uniquement pour récupérer la haptique système si besoin
+- `SwiftUI` — UI in-app (Home, Settings, Onboarding, InCall)
+- `AppIntents` — déclenchement via Raccourcis / Back Tap / Action Button
+- `CallKit` — UI d'appel entrant système (ring phase, lock screen OK)
+- `UIKit` (minimal) — `isIdleTimerDisabled`, `UIImpactFeedbackGenerator`
+- `OSLog` — logs structurés
 
-### ⚠️ Pas de CallKit
-On NE passe PAS par CallKit (le vrai framework d'appels). Raisons :
-- Complexité élevée, permissions CallDirectory.
-- Apple refuse presque systématiquement les apps CallKit qui ne sont pas de vrais clients VoIP.
-- On recrée l'UI à l'identique en SwiftUI, ça suffit pour l'illusion.
+### ✅ CallKit — pourquoi, et comment rester compliant
+On passe par `CXProvider.reportNewIncomingCall` car c'est la **seule API iOS** qui fonctionne sur un appareil verrouillé pour présenter une UI d'appel entrant avec sonnerie + vibration. Sans CallKit, un App Intent avec `openAppWhenRun = true` n'active pas la scène tant que Face ID n'a pas déverrouillé → pas de son, pas de vibration. C'est le bug central que v1.1 corrige.
+
+Pour éviter un rejet App Store, le code applique **7 règles non négociables** (voir §9).
 
 ---
 
@@ -54,217 +55,219 @@ On NE passe PAS par CallKit (le vrai framework d'appels). Raisons :
 
 ```
 Tunnel/
-├── TunnelApp.swift                # Entry point, @main
-├── ContentView.swift              # Router : Home ou IncomingCall
+├── TunnelApp.swift                # Entry point, @main, warm-up CallKitManager
+├── ContentView.swift              # Router 4 écrans (Home / Onboarding / InCall / Settings)
 │
 ├── Models/
-│   ├── FakeCallConfig.swift       # Struct config : nom, photo, sonnerie, délai
-│   └── AppState.swift             # @Observable state global (mode actuel)
+│   ├── FakeCallConfig.swift       # Struct Codable : contactName, subtitle, fakePhoneNumber, contactImageData
+│   └── AppState.swift             # @Observable, screen state, config persistence, CallKit callbacks
 │
 ├── Views/
-│   ├── HomeView.swift             # Écran principal : bouton "Déclencher" + réglages
-│   ├── IncomingCallView.swift     # ⭐ Écran faux appel (clone iOS)
-│   ├── InCallView.swift           # Écran après "décrochage" (timer, mute, etc.)
-│   ├── SettingsView.swift         # Config : contact, photo, délai, sonnerie
-│   └── Components/
-│       ├── CallActionButton.swift # Boutons verts/rouges ronds
-│       └── SlideToAnswer.swift    # Slider "glisser pour répondre"
+│   ├── HomeView.swift             # Bouton "Sortir du tunnel" (déclenchement immédiat)
+│   ├── OnboardingView.swift       # Tuto Back Tap / Action Button / Raccourci
+│   ├── InCallView.swift           # Écran après décrochage (timer, raccrocher)
+│   ├── SettingsView.swift         # Config contact (nom, sous-titre, numéro, photo)
+│   └── PrivacyPolicyView.swift    # Politique in-app
 │
 ├── Services/
-│   ├── RingtonePlayer.swift       # AVAudioPlayer + gestion du mode silencieux
-│   ├── HapticsManager.swift       # CoreHaptics patterns (vibration d'appel)
-│   └── FakeCallScheduler.swift    # Timer pour déclenchement différé
+│   └── CallKitManager.swift       # ⭐ Seul fichier qui importe CallKit, applique les 7 règles
 │
 ├── Intents/
-│   ├── TriggerTunnelIntent.swift          # App Intent (Back Tap / Shortcuts)
-│   └── TunnelAppShortcuts.swift           # Expose l'intent au système
+│   ├── TriggerTunnelIntent.swift  # AppIntent (openAppWhenRun = false) → CallKitManager
+│   └── TunnelAppShortcuts.swift   # Expose l'intent au système (Siri / Back Tap)
 │
 └── Resources/
-    ├── Assets.xcassets             # Icône app, couleurs, photo par défaut
-    └── Sounds/
-        └── default_ringtone.caf    # Sonnerie par défaut (libre de droits)
+    └── Assets.xcassets            # Icône app, couleurs
 ```
 
----
-
-## 4. Fonctionnalités — MVP (v1.0)
-
-### 🎯 Must-have
-1. **Écran faux appel** visuellement identique à iOS (lockscreen + in-app).
-2. **Déclenchement immédiat** depuis un bouton dans l'app.
-3. **Déclenchement différé** (3s / 5s / 10s / 30s / 1min) pour laisser le temps de ranger le téléphone.
-4. **Déclenchement via App Intent** pour Back Tap et Raccourcis Siri.
-5. **Configuration du contact** : nom, photo, numéro factice.
-6. **Sonnerie par défaut** + haptique qui imite un appel entrant.
-7. **Slide-to-answer** + bouton rouge pour raccrocher.
-8. **Écran "in-call"** avec timer qui défile après décrochage.
-
-### 💡 Nice-to-have (v1.1+)
-- Plusieurs contacts préconfigurés ("Maman", "Boss", "Médecin")
-- Voix pré-enregistrées qui se lancent au décrochage (lip-sync)
-- Widget Lock Screen pour trigger en 1 tap
-- Apple Watch companion (trigger depuis la montre)
-- Mode "FaceTime" en plus de l'appel classique
+**Compartimentation stricte :** `CallKit` n'est importé que dans `CallKitManager.swift`. Aucun autre fichier ne touche aux APIs CallKit. Le reste du code passe par les méthodes publiques de `AppState` (`triggerFakeCallNow`, `endCall`) et les callbacks (`didAnswerCallKit`, `didEndCallKit`).
 
 ---
 
-## 5. Spécifications UI — Écran faux appel
+## 4. Flux d'appel (référence)
 
-### Référence visuelle
-Reproduire l'écran d'appel entrant iOS 17/18 à l'identique :
-- Fond : blur gradient sombre
-- Photo de contact : cercle 120pt, centré, en haut
-- Nom du contact : SF Pro Display, 32pt, weight semibold, blanc
-- Sous-titre : "mobile" en 17pt, blanc 70%
-- Boutons en bas :
-  - Rond rouge (decline) : 72pt, icône `phone.down.fill`
-  - Rond vert (accept) : 72pt, icône `phone.fill`, anime en pulse
-- Si lockscreen-like : remplacer boutons par slide-to-answer
+```
+Back Tap / Action Button / Raccourci Siri
+  → TriggerTunnelIntent.perform() (openAppWhenRun = false)
+  → CallKitManager.reportIncomingCall(contactName:)
+  → CXProvider.reportNewIncomingCall
+  → UI iOS native plein écran (lock screen OK, sonnerie système, vibration)
+       │
+       ├── Accept → CXAnswerCallAction → AppState.didAnswerCallKit()
+       │           → screen = .inCall → iOS ouvre l'app (Face ID si verrouillé)
+       │           → InCallView visible
+       │
+       └── Decline → CXEndCallAction → AppState.didEndCallKit()
+                   → app reste fermée / dans son état précédent
+```
 
-### Animations
-- Pulse doux sur bouton vert (scale 1.0 ↔ 1.08, 1.5s ease-in-out infini)
-- Vibration haptique en pattern : 1s on / 2s off, répété
-- Sonnerie en loop jusqu'à action utilisateur
-
-### Mode lockscreen vs in-app
-Commencer simple : UN SEUL écran plein écran qui ressemble à l'appel en in-app. Le "lockscreen mode" viendra plus tard (nécessite Live Activities ou Focus).
-
-### Identité visuelle Tunnel (hors écran faux appel)
-Sur les écrans **Home / Settings / Onboarding**, ne PAS reproduire l'UI iOS. Développer une identité propre à Tunnel :
-- Direction artistique cohérente avec le nom : sensation d'échappée, de passage, de sortie.
-- Palette à définir plus tard — commencer sobre (noir / blanc / un accent de couleur).
-- L'écran d'appel reste le seul endroit qui mime iOS, pour le réalisme.
+Le déclenchement **immédiat depuis le bouton HomeView** passe par le même chemin (`AppState.triggerFakeCallNow` → `CallKitManager`) pour éviter deux implémentations divergentes.
 
 ---
 
-## 6. Implémentation critique — App Intent
+## 5. Spécifications UI — écrans in-app
 
-C'est le point le plus important pour que **Back Tap fonctionne**. Back Tap ne peut pas lancer une app directement ; il passe par un Raccourci Siri qui exécute un App Intent.
+### HomeView
+Identité propre Tunnel (ne mime PAS iOS). Bouton central "Sortir du tunnel". Lien discret vers Settings.
+
+### InCallView
+Affichée après décrochage. Timer qui défile. Bouton "Raccrocher" rouge qui appelle `AppState.endCall()`.
+
+### Écran d'appel entrant
+**N'existe plus dans le code.** C'est la UI système CallKit qui est affichée. Rien à styliser.
+
+### Mode lockscreen
+Géré nativement par CallKit. Rien à faire côté app.
+
+---
+
+## 6. Conventions de code
+
+- **SwiftUI uniquement**, pas de UIViewRepresentable sauf nécessité absolue.
+- **Async/await** pour toute opération asynchrone, pas de completion handlers (sauf là où l'API Apple l'impose, ex. `CXCallController.request`).
+- **`@Observable`** (Swift Observation, iOS 17+) plutôt que `@ObservableObject`.
+- **Une view = un fichier**. Décomposer agressivement.
+- **Nommage** : anglais pour le code, **français** pour les strings UI (public FR d'abord).
+- **Pas de `print()`** : `Logger` d'OSLog uniquement (`subsystem: "rewolf.Tunnel"`).
+- **Previews SwiftUI** pour chaque view.
+- **`@MainActor`** sur tout ce qui touche `AppState` ou l'UI.
+
+---
+
+## 7. Implémentation critique — App Intent
+
+Back Tap passe par un Raccourci Siri → `AppIntent`. Le point-clé :
 
 ```swift
-import AppIntents
-
 struct TriggerTunnelIntent: AppIntent {
     static var title: LocalizedStringResource = "Déclencher Tunnel"
-    static var description = IntentDescription("Lance immédiatement un faux appel entrant.")
-    
-    // Important : ouvre l'app au premier plan
-    static var openAppWhenRun: Bool = true
-    
-    @Parameter(title: "Délai (secondes)", default: 0)
-    var delay: Int
-    
+    static var openAppWhenRun: Bool = false    // ⚠️ CRITIQUE — CallKit owns the UI
+
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppState.shared.scheduleFakeCall(delay: TimeInterval(delay))
+        try await CallKitManager.shared.reportIncomingCall(
+            contactName: AppState.shared.config.contactName
+        )
         return .result()
     }
 }
-
-struct TunnelAppShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: TriggerTunnelIntent(),
-            phrases: [
-                "Lance \(.applicationName)",
-                "\(.applicationName) appelle-moi",
-                "Sors-moi du tunnel avec \(.applicationName)"
-            ],
-            shortTitle: "Déclencher Tunnel",
-            systemImageName: "phone.fill"
-        )
-    }
-}
 ```
 
-### Parcours utilisateur pour activer Back Tap
-À documenter dans un onboarding in-app :
-1. Ouvrir **Réglages > Accessibilité > Toucher > Toucher au dos**
-2. Choisir **Double toucher** ou **Triple toucher**
-3. Sélectionner **Raccourci** > **Déclencher Tunnel** (qui apparaît automatiquement grâce à `AppShortcutsProvider`)
+`openAppWhenRun = false` est **critique** : si `true`, iOS tenterait d'amener l'app au premier plan en même temps que CallKit présente sa UI, ce qui ferait flasher HomeView derrière la carte CallKit. Ce qui défait tout l'intérêt de la migration.
+
+### Parcours utilisateur Back Tap (à documenter dans OnboardingView)
+1. Réglages → Accessibilité → Toucher → Toucher au dos
+2. Double toucher OU Triple toucher
+3. Raccourci → Déclencher Tunnel
 
 ---
 
-## 7. Implémentation critique — Son + Vibration
+## 8. Implémentation critique — CallKit (`CallKitManager`)
 
-### Sonnerie
-Utiliser `AVAudioPlayer` en mode `.playback` pour que ça sonne **même en mode silencieux** (important pour le réalisme). Activer la boucle.
+Fichier unique : `Tunnel/Services/CallKitManager.swift`. Singleton `@MainActor`.
 
-```swift
-let session = AVAudioSession.sharedInstance()
-try session.setCategory(.playback, mode: .default)
-try session.setActive(true)
+**Ce qu'il fait :**
+- Crée un `CXProvider` au démarrage (warm-up depuis `TunnelApp.init`).
+- Expose `reportIncomingCall(contactName:)` et `endActiveCall()`.
+- Implémente `CXProviderDelegate` pour router les `CXAnswerCallAction` / `CXEndCallAction` vers `AppState`.
 
-player = try AVAudioPlayer(contentsOf: url)
-player?.numberOfLoops = -1 // loop infini
-player?.play()
-```
-
-⚠️ Ajouter `UIBackgroundModes > audio` dans `Info.plist` si on veut que le son continue si l'écran se verrouille pendant le délai.
-
-### Haptique
-CoreHaptics pattern qui imite l'appel :
-- Sharp transient toutes les ~200ms pendant 1s
-- Pause 2s
-- Répéter
-
-Fallback sur `UINotificationFeedbackGenerator` si haptique indisponible.
+**Ce qu'il ne fait PAS (règles §9) :**
+- Aucun `didActivate(audioSession:)` → règle 6
+- Aucune persistance de l'UUID (in-memory uniquement) → règle 7
+- Aucun ringtone custom → règle 5
+- `CXHandle.type = .generic` hardcodé (jamais `.phoneNumber`) → règle 3
+- `includesCallsInRecents = false` → règle 4
 
 ---
 
-## 8. Conventions de code
+## 9. Compliance App Store — les 7 règles (non négociables)
 
-- **SwiftUI uniquement**, pas de UIViewRepresentable sauf nécessité absolue.
-- **Async/await** pour toute opération asynchrone, pas de completion handlers.
-- **`@Observable`** (Swift Observation, iOS 17+) plutôt que `@ObservableObject`.
-- **Une view = un fichier**. Décomposer agressivement.
-- **Nommage** : anglais pour le code, **français** pour les strings UI (l'app vise un public français d'abord).
-- **Pas de print()** : utiliser `Logger` d'OSLog.
-- **Previews SwiftUI obligatoires** pour chaque view.
+Apple approuve les fake-call apps qui utilisent CallKit **sans prétendre être un client VoIP**. Chaque règle ci-dessous envoie un signal spécifique au reviewer.
 
----
+| # | Règle | Où appliquée | Signal |
+|---|---|---|---|
+| 1 | `UIBackgroundModes = audio` uniquement — **jamais `voip`** | Info.plist | "Pas un VoIP app" |
+| 2 | Aucun PushKit, aucun entitlement VoIP | project + entitlements | Idem |
+| 3 | `CXHandle(type: .generic, ...)` — **pas `.phoneNumber`** | `CallKitManager.reportIncomingCall` | "On ne spoofe pas de numéro" |
+| 4 | `CXProviderConfiguration.includesCallsInRecents = false` | `CallKitManager.init` | "Pas de pollution Phone.app" |
+| 5 | `ringtoneSound = nil` (sonnerie système) | `CallKitManager.init` | "On n'imite aucun autre app" |
+| 6 | Aucun audio routé via la session CallKit | Pas de `provider(_:didActivate:)` | "Pas de voix réelle" |
+| 7 | Aucune persistance du call UUID | `private var currentCallUUID` | "Pas de surface data-privacy" |
 
-## 9. Piège à éviter à la review Apple
+Ces règles se traduisent directement dans le code — aucun toggle utilisateur ne peut les contourner.
 
-Apple est OK avec les fake call apps (il y en a plein sur le store). Pour éviter le rejet :
-- **Description App Store honnête** : "Tunnel — app de prank qui simule un appel entrant pour vous sortir de conversations gênantes".
-- **Pas de CallKit.**
-- **Ne pas imiter un contact réel par défaut** : photo générique et nom "Contact" par défaut, à l'utilisateur de customiser.
-- **Mentionner** dans la description que l'app nécessite une action manuelle de l'utilisateur (pas un appel réel).
+### Positionnement App Store (description + mots-clés)
+- **À utiliser** : "sortir poliment d'une conversation", "outil social", "extraction discrète", "Back Tap"
+- **À éviter absolument** : "prank", "trick", "fool", "fake" (dans le marketing — "simulation" est OK)
 
----
-
-## 10. Roadmap de développement (ordre suggéré pour Cursor)
-
-1. ⚙️ Scaffold : créer le projet Xcode, dossiers, fichiers vides.
-2. 🎨 `IncomingCallView` statique (pas de logique, juste l'UI parfaite).
-3. 🏠 `HomeView` avec bouton "Déclencher maintenant" qui navigue vers `IncomingCallView`.
-4. 🔊 `RingtonePlayer` + son par défaut.
-5. 📳 `HapticsManager` + pattern d'appel.
-6. ⏱ `FakeCallScheduler` avec délai configurable.
-7. 📞 `InCallView` (timer, raccrocher).
-8. ⚙️ `SettingsView` + persistance `@AppStorage`.
-9. 🤖 `TriggerTunnelIntent` + `TunnelAppShortcuts`.
-10. 📖 Onboarding Back Tap (écran explicatif au premier lancement).
-11. 🎨 Icône app + polissage final.
-12. 🧪 Tests sur device physique (le simulateur ne fait PAS les haptiques).
+### Notes for App Review (à coller dans App Store Connect lors de la soumission v1.1)
+Voir `/Users/nicolas/.claude/plans/lexical-wobbling-kurzweil.md` section "Notes pour l'App Review".
 
 ---
 
-## 11. Ressources
+## 10. Ce qui a changé en v1.1 (migration CallKit)
 
-- [Human Interface Guidelines — Phone](https://developer.apple.com/design/human-interface-guidelines/phone)
+**Supprimés :**
+- `IncomingCallView.swift` (remplacé par UI iOS native)
+- `SlideToAnswer.swift`, `CallActionButton.swift` (orphelins)
+- `HapticsManager.swift` (CallKit gère vibration)
+- `RingtonePlayer.swift` (CallKit gère sonnerie — règle 5)
+- Champs config `useSlideToAnswer`, `ringtoneName`
+- Toggle "Glisser pour répondre" + Picker de sonnerie dans Settings
+- Ancienne logique `scenePhase` / `pendingTrigger` / `setSceneActive` dans AppState
+
+**Ajoutés :**
+- `Services/CallKitManager.swift` (seul fichier avec `import CallKit`)
+- `AppState.didAnswerCallKit()` / `didEndCallKit()` callbacks
+- Warm-up `CallKitManager.shared` dans `TunnelApp.init`
+
+**Changé :**
+- `TriggerTunnelIntent.openAppWhenRun = false` (était `true`)
+- `ContentView` passe de 5 à 4 cases (plus de `.incomingCall`)
+
+---
+
+## 11. Testing (device physique obligatoire)
+
+CallKit **ne tourne pas en simulateur**. Tester sur iPhone physique :
+
+| Scénario | Vérification |
+|---|---|
+| Lock screen + Back Tap | UI plein écran, sonnerie système, vibration |
+| Lock screen + Action Button | Idem |
+| Déverrouillé, background | UI plein écran |
+| Déverrouillé, foreground | Bannière CallKit (standard iOS) |
+| Accept | Face ID si verrouillé → InCallView |
+| Decline | App ne s'ouvre pas |
+| Raccrocher depuis InCallView | Retour `.home`, rien dans Recents |
+| Pendant un vrai appel | CallKit refuse silencieusement |
+| Silent switch | Pas de son, vibration OK |
+
+**Smoke test pré-submission :**
+1. Build v1.1 sur iPhone physique verrouillé.
+2. Back Tap → UI d'appel immédiate.
+3. Accept → Face ID → InCallView.
+4. Raccrocher → Home.
+5. App Téléphone → Recents → doit être vide.
+
+---
+
+## 12. Ressources
+
+- [CallKit documentation](https://developer.apple.com/documentation/callkit)
 - [App Intents documentation](https://developer.apple.com/documentation/appintents)
-- [Core Haptics patterns](https://developer.apple.com/documentation/corehaptics)
-- Sonneries libres de droits : [freesound.org](https://freesound.org) (filtrer par licence CC0)
+- [Human Interface Guidelines — CallKit](https://developer.apple.com/design/human-interface-guidelines/callkit)
+- Apps de référence approuvées en CallKit local : Introscape, Faker 3, Fake Call Pro
 
 ---
 
-## 12. Instructions pour Cursor
+## 13. Instructions pour Claude / Cursor
 
 - **Toujours lire ce CLAUDE.md en entier avant d'agir.**
-- Travailler fichier par fichier, dans l'ordre de la roadmap (§10).
-- Générer les SwiftUI Previews pour chaque view.
-- Respecter les conventions §8.
-- En cas de doute sur un choix Apple (permissions, Info.plist), DEMANDER plutôt que deviner.
+- **`import CallKit` uniquement dans `CallKitManager.swift`**. Jamais ailleurs.
+- **Ne jamais** proposer de réintroduire `RingtonePlayer`, `HapticsManager`, ou une UI d'appel entrant custom. CallKit gère tout ça.
+- **Ne jamais** changer `openAppWhenRun` à `true` dans `TriggerTunnelIntent`.
+- **Ne jamais** passer `.phoneNumber` comme `CXHandle.type`.
+- **Ne jamais** implémenter `provider(_:didActivate:)` ou `provider(_:didDeactivate:)`.
+- En cas de doute sur un choix Apple (permissions, Info.plist, entitlements), DEMANDER plutôt que deviner.
 - Vérifier que le code compile sur iOS 17+ minimum.

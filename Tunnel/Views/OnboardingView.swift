@@ -33,12 +33,12 @@ struct OnboardingView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Déclenche sans toucher l'écran")
-                .font(.system(size: 32, weight: .bold))
+                .font(.title.weight(.bold))
                 .tracking(-0.5)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("Associe Tunnel à un geste ou à un bouton pour lancer un faux appel en silence, même main dans la poche.")
-                .font(.system(size: 16))
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -107,6 +107,7 @@ struct OnboardingView: View {
         .buttonStyle(.glassProminent)
         .controlSize(.extraLarge)
         .tint(Color.accentColor)
+        .accessibilityLabel("Terminer l'onboarding et revenir à l'accueil")
     }
 }
 
@@ -133,19 +134,21 @@ private struct MethodCard: View {
                 }
 
                 Text(label)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.headline)
 
                 Spacer()
             }
 
             Text(description)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                     HStack(alignment: .top, spacing: 10) {
+                        // Fixed size: sits inside a 18×18 circle, Dynamic
+                        // Type would overflow the decorative badge.
                         Text("\(index + 1)")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(.secondary)
@@ -153,7 +156,7 @@ private struct MethodCard: View {
                             .background(Color.accentColor.opacity(0.12), in: .circle)
 
                         Text(step)
-                            .font(.system(size: 14))
+                            .font(.subheadline)
                             .foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -166,6 +169,9 @@ private struct MethodCard: View {
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: 16))
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label). \(description)")
+        .accessibilityHint("\(steps.count) étapes à suivre dans les Réglages")
     }
 }
 

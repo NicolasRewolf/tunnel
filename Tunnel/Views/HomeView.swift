@@ -18,11 +18,11 @@ struct HomeView: View {
 
                 VStack(spacing: 8) {
                     Text("Tunnel")
-                        .font(.system(size: 44, weight: .bold))
+                        .font(.largeTitle.weight(.bold))
                         .tracking(-0.8)
 
                     Text("Sortir d'une conversation en un geste.")
-                        .font(.system(size: 17))
+                        .font(.body)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
@@ -43,6 +43,7 @@ struct HomeView: View {
                 .buttonStyle(.glassProminent)
                 .controlSize(.extraLarge)
                 .tint(Theme.green)
+                .accessibilityLabel("Sortir du tunnel, déclenche un faux appel")
 
                 HStack(spacing: 12) {
                     Button { appState.openOnboarding() } label: {
@@ -52,6 +53,7 @@ struct HomeView: View {
                     }
                     .buttonStyle(.glass)
                     .controlSize(.large)
+                    .accessibilityLabel("Configurer les raccourcis de déclenchement")
 
                     Button { appState.openSettings() } label: {
                         Label("Réglages", systemImage: "gearshape.fill")
@@ -60,11 +62,28 @@ struct HomeView: View {
                     }
                     .buttonStyle(.glass)
                     .controlSize(.large)
+                    .accessibilityLabel("Ouvrir les réglages")
                 }
                 .padding(.top, 12)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
+        }
+        .overlay(alignment: .top) { errorToast }
+        .animation(.easeOut(duration: 0.25), value: appState.lastTriggerError)
+    }
+
+    @ViewBuilder
+    private var errorToast: some View {
+        if let message = appState.lastTriggerError {
+            ErrorToast(message: message)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .task(id: message) {
+                    try? await Task.sleep(for: .seconds(3))
+                    appState.lastTriggerError = nil
+                }
         }
     }
 
@@ -133,4 +152,32 @@ struct HomeView: View {
 
 #Preview {
     HomeView(appState: AppState.shared)
+}
+
+// MARK: - Error toast
+
+private struct ErrorToast: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.red)
+                .padding(.top, 1)
+
+            Text(message)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
+    }
 }

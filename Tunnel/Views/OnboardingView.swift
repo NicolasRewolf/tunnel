@@ -1,82 +1,39 @@
 import SwiftUI
 
-/// iOS 26 Liquid Glass onboarding screen.
+/// Onboarding explaining how to trigger a fake call discreetly — the core value of Tunnel.
+/// Surfaces the primary method (Back Tap) and a zero-setup alternative (Siri).
 struct OnboardingView: View {
     let appState: AppState
 
-    private let steps: [(number: String, title: String, subtitle: String)] = [
-        ("1", "Réglages iPhone", "Accessibilité › Toucher › Toucher au dos"),
-        ("2", "Choisis un geste", "Double toucher ou Triple toucher"),
-        ("3", "Associe Tunnel", "Raccourci › Déclencher Tunnel")
+    private let steps: [Step] = [
+        Step(
+            number: "1",
+            title: "Ouvre les Réglages iOS",
+            path: "Accessibilité › Toucher › Toucher au dos"
+        ),
+        Step(
+            number: "2",
+            title: "Choisis ton geste",
+            path: "Double toucher ou Triple toucher"
+        ),
+        Step(
+            number: "3",
+            title: "Associe Tunnel",
+            path: "Raccourci › Lancer un faux appel"
+        )
     ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 32) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Active Back Tap")
-                            .font(.system(size: 34, weight: .bold))
-                            .tracking(-0.5)
+                VStack(alignment: .leading, spacing: 28) {
+                    header
+                    stepsCard
+                    siriAlternative
 
-                        Text("Déclenche un faux appel en tapotant l'arrière de ton iPhone.")
-                            .font(.system(size: 17))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 8)
+                    Spacer(minLength: 32)
 
-                    // Steps with Liquid Glass container
-                    VStack(spacing: 0) {
-                        ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                            stepRow(step)
-
-                            if index < steps.count - 1 {
-                                Divider()
-                                    .padding(.leading, 60)
-                            }
-                        }
-                    }
-                    .background {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.clear)
-                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
-                    }
-
-                    // Tip row
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "lightbulb.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Color(red: 1.0, green: 0.78, blue: 0.18))
-                            .padding(.top, 2)
-
-                        Text("Tu peux tester Tunnel à tout moment avec le bouton **Lancer un faux appel** depuis l'accueil.")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 40)
-
-                    VStack(spacing: 10) {
-                        Button {
-                            appState.completeOnboarding()
-                        } label: {
-                            Text("J'ai configuré Back Tap")
-                                .font(.system(size: 17, weight: .semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .controlSize(.extraLarge)
-                        .tint(Color.accentColor)
-
-                        Button("Configurer plus tard") {
-                            appState.dismissOnboarding()
-                        }
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                    }
+                    actions
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -87,7 +44,42 @@ struct OnboardingView: View {
         }
     }
 
-    private func stepRow(_ step: (number: String, title: String, subtitle: String)) -> some View {
+    // MARK: - Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Déclenche sans toucher ton iPhone")
+                .font(.system(size: 32, weight: .bold))
+                .tracking(-0.5)
+
+            Text("Deux tapes à l'arrière de ton iPhone suffisent à lancer un faux appel — même dans ta poche, au milieu d'une conversation.")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Steps card
+
+    private var stepsCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                stepRow(step)
+
+                if index < steps.count - 1 {
+                    Divider().padding(.leading, 60)
+                }
+            }
+        }
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        }
+    }
+
+    private func stepRow(_ step: Step) -> some View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
@@ -103,7 +95,7 @@ struct OnboardingView: View {
                 Text(step.title)
                     .font(.system(size: 17, weight: .medium))
 
-                Text(step.subtitle)
+                Text(step.path)
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }
@@ -112,6 +104,60 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
+    }
+
+    // MARK: - Siri alternative
+
+    private var siriAlternative: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 15))
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Ou par la voix")
+                    .font(.system(size: 15, weight: .semibold))
+
+                Text("Dis à Siri : « Lance Tunnel » ou « Tunnel appelle-moi ».")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    private var actions: some View {
+        VStack(spacing: 10) {
+            Button {
+                appState.completeOnboarding()
+            } label: {
+                Text("C'est prêt")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.glassProminent)
+            .controlSize(.extraLarge)
+            .tint(Color.accentColor)
+
+            Button("Plus tard") {
+                appState.dismissOnboarding()
+            }
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 4)
+        }
+    }
+
+    // MARK: - Model
+
+    private struct Step {
+        let number: String
+        let title: String
+        let path: String
     }
 }
 

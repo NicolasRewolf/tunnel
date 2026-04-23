@@ -1,15 +1,16 @@
 import AppIntents
 
+/// Surfaces Tunnel's single action to Siri, Shortcuts, Back Tap, and Spotlight.
 struct TunnelAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: TriggerTunnelIntent(),
             phrases: [
                 "Lance \(.applicationName)",
-                "\(.applicationName) appelle-moi",
-                "Sors-moi du tunnel avec \(.applicationName)"
+                "Déclenche \(.applicationName)",
+                "\(.applicationName) appelle-moi"
             ],
-            shortTitle: "Déclencher Tunnel",
+            shortTitle: "Lancer un faux appel",
             systemImageName: "phone.fill"
         )
     }

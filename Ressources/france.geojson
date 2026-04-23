@@ -1,0 +1,34 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "France"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [-5.5, 41.0],
+              [9.9, 41.0],
+              [9.9, 51.6],
+              [-5.5, 51.6],
+              [-5.5, 41.0]
+            ]
+          ],
+          [
+            [
+              [8.4, 41.2],
+              [9.6, 41.2],
+              [9.6, 43.2],
+              [8.4, 43.2],
+              [8.4, 41.2]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

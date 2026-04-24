@@ -71,15 +71,14 @@ struct SettingsView: View {
             }
             .padding(.vertical, 4)
 
-            TextField("Nom", text: $appState.config.contactName)
-            TextField("Sous-titre", text: $appState.config.contactSubtitle)
-                .textInputAutocapitalization(.never)
-            TextField("Numéro", text: $appState.config.fakePhoneNumber)
-                .keyboardType(.phonePad)
+            TextField("Maman", text: $appState.config.contactName)
+                .textInputAutocapitalization(.words)
+            TextField("Mobile", text: $appState.config.contactSubtitle)
+                .textInputAutocapitalization(.words)
         } header: {
             Text("Contact")
         } footer: {
-            Text("Ces informations apparaîtront sur l'écran d'appel.")
+            Text("Le nom et le sous-titre apparaissent sur l'écran d'appel.")
         }
     }
 

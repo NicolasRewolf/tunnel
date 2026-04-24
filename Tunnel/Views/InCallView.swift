@@ -42,6 +42,14 @@ struct InCallView: View {
                     .minimumScaleFactor(0.7)
                     .padding(.horizontal, 24)
 
+                if !appState.config.contactSubtitle.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text(appState.config.contactSubtitle)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                        .padding(.top, 2)
+                }
+
                 TimelineView(.periodic(from: callStartDate, by: 1)) { timeline in
                     Text(durationLabel(for: timeline.date))
                         .font(.system(size: 17, weight: .regular))

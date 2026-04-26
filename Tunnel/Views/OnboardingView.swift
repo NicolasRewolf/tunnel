@@ -11,6 +11,8 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     header
 
+                    volumeTipCard
+
                     primaryMethod
                     secondaryMethod
                     tertiaryMethod
@@ -43,6 +45,26 @@ struct OnboardingView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 8)
+    }
+
+    // MARK: - Sonnerie (réglages iPhone)
+
+    private var volumeTipCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            MethodCard(
+                icon: "speaker.wave.3.fill",
+                label: RingerVolumeGuide.title,
+                description: RingerVolumeGuide.lead,
+                steps: RingerVolumeGuide.steps,
+                featured: true
+            )
+
+            Link(destination: RingerVolumeGuide.appleSupportURL) {
+                Label("Aide Apple : volume et sonnerie", systemImage: "safari")
+                    .font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 4)
+        }
     }
 
     // MARK: - Method 1: Back Tap (featured)

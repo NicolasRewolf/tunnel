@@ -3,7 +3,7 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
-/// Personnalisation du faux appel : aperçu immédiat, champs étiquetés, raccourcis pour la légende.
+/// Réglages : ordre par importance — faux appel (aperçu, identité, photo), son, aide, à propos.
 struct SettingsView: View {
     @Bindable var appState: AppState
     @State private var photoSelection: PhotosPickerItem?
@@ -59,12 +59,16 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                previewSection
-                appearanceSection
-                identitySection
-                captionSection
+                // 1 — le plus important : objectif + texte de l’appel (crédibilité)
+                callPreviewSection
+                nameAndLineSection
+                photoSection
+                // 2 — entendre l’appel
+                soundSection
+                // 3 — déclencher, vie privée
                 helpSection
-                footerSection
+                // 4 — méta
+                aboutSection
             }
             .navigationTitle("Réglages")
             .navigationBarTitleDisplayMode(.inline)
@@ -91,78 +95,31 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Sections
+    // MARK: - 1. Faux appel (le plus important)
 
-    private var previewSection: some View {
+    private var callPreviewSection: some View {
         Section {
             callPreviewCard
         } header: {
             Label("Aperçu", systemImage: "eye.fill")
         } footer: {
-            Text("Ce que tu verras après avoir décroché. Le même nom apparaît aussi sur l’écran d’appel entrant.")
+            Text("Aperçu de l’écran après décrochage. Le nom et la photo apparaissent aussi sur l’appel entrant.")
         }
     }
 
-    private var appearanceSection: some View {
-        Section {
-            HStack(alignment: .center, spacing: 14) {
-                avatarPreview(large: true)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    PhotosPicker(
-                        selection: $photoSelection,
-                        matching: .images,
-                        photoLibrary: .shared()
-                    ) {
-                        Label(
-                            appState.config.contactImageData == nil ? "Choisir une photo" : "Remplacer la photo",
-                            systemImage: "photo.on.rectangle.angled"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Photo du contact pour l’aperçu et le fond flouté")
-
-                    if appState.config.contactImageData != nil {
-                        Button("Retirer la photo", role: .destructive) {
-                            photoSelection = nil
-                            appState.config.contactImageData = nil
-                        }
-                        .font(.subheadline)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 4)
-        } header: {
-            Text("Photo")
-        } footer: {
-            Text("Optionnel. Sert pour l’avatar et le flou derrière pendant l’appel.")
-        }
-    }
-
-    private var identitySection: some View {
+    private var nameAndLineSection: some View {
         Section {
             TextField("", text: $appState.config.contactName, prompt: Text("ex. Léa Martin"))
                 .textContentType(.name)
                 .textInputAutocapitalization(.words)
-        } header: {
-            Text("Nom affiché")
-        } footer: {
-            Text("C’est le nom que verront les autres s’ils jettent un œil à ton écran — choisis quelque chose de crédible.")
-        }
-    }
 
-    private var captionSection: some View {
-        Section {
             Picker("Type de ligne", selection: $subtitlePreset) {
                 ForEach(SubtitlePreset.allCases.filter { $0 != .personnalise }) { preset in
                     Text(preset.label).tag(preset)
                 }
                 Text(SubtitlePreset.personnalise.label).tag(SubtitlePreset.personnalise)
             }
-            .accessibilityLabel("Type de ligne sous le nom")
+            .accessibilityLabel("Légende sous le nom, comme sur Téléphone")
             .onChange(of: subtitlePreset) { _, new in
                 if new != .personnalise {
                     appState.config.contactSubtitle = new.storedValue
@@ -170,15 +127,82 @@ struct SettingsView: View {
             }
 
             if subtitlePreset == .personnalise {
-                TextField("", text: $appState.config.contactSubtitle, prompt: Text("ex. iPhone, Apple Watch"))
+                TextField("", text: $appState.config.contactSubtitle, prompt: Text("ex. iPhone, Urgence"))
                     .textInputAutocapitalization(.sentences)
             }
         } header: {
-            Text("Légende sous le nom")
+            Text("Qui appelle ?")
         } footer: {
-            Text("Sur iPhone, ce texte ressemble au petit libellé « Fixe » ou « Portable » sous le contact.")
+            Text(
+                "C’est l’appât principal : un nom + une légende crédibles (comme sur un vrai appel : Fixe, Portable, etc.)."
+            )
         }
     }
+
+    private var photoSection: some View {
+        Section {
+            HStack(alignment: .center, spacing: 14) {
+                avatarPreview(large: true)
+                contactPhotoStack
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Photo")
+        } footer: {
+            Text("Optionnel mais utile : avatar sur l’appel et arrière-plan flouté. Tu peux rester en silhouette si tu préfères.")
+        }
+    }
+
+    /// Libellé et présence d’image sont lus ici (main actor) ; le `Label` du `PhotosPicker` ne capte qu’un `String` (Sendable).
+    private var contactPhotoStack: some View {
+        let hasImage = appState.config.contactImageData != nil
+        let pickerTitle = hasImage ? "Remplacer la photo" : "Choisir une photo"
+        return VStack(alignment: .leading, spacing: 8) {
+            PhotosPicker(
+                selection: $photoSelection,
+                matching: .images,
+                photoLibrary: .shared()
+            ) {
+                Label(pickerTitle, systemImage: "photo.on.rectangle.angled")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Photo du contact pour l’aperçu et le fond flouté")
+
+            if hasImage {
+                Button("Retirer la photo", role: .destructive) {
+                    photoSelection = nil
+                    appState.config.contactImageData = nil
+                }
+                .font(.subheadline)
+            }
+        }
+    }
+
+    // MARK: - 2. Son
+
+    private var soundSection: some View {
+        Section {
+            Text(RingerVolumeGuide.lead)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            RingerVolumeNumberedSteps(steps: RingerVolumeGuide.steps)
+
+            Link(destination: RingerVolumeGuide.appleSupportURL) {
+                Label("Aide Apple : volume et sonnerie", systemImage: "safari")
+            }
+        } header: {
+            Label("Son", systemImage: "speaker.wave.2.fill")
+        } footer: {
+            Text(
+                "Même sonnerie qu’un appel réel. Untunnel ne peut pas régler ce volume à ta place : tout se fait dans les Réglages iPhone, étapes ci-dessus."
+            )
+        }
+    }
+
+    // MARK: - 3. Aide
 
     private var helpSection: some View {
         Section {
@@ -188,10 +212,16 @@ struct SettingsView: View {
             navigationRow(icon: "lock.shield.fill", label: "Confidentialité") {
                 showPrivacyPolicy = true
             }
+        } header: {
+            Text("Aide")
+        } footer: {
+            Text("Toucher au dos, Action Button, Raccourcis : le détail est dans l’onboarding.")
         }
     }
 
-    private var footerSection: some View {
+    // MARK: - 4. À propos
+
+    private var aboutSection: some View {
         Section {
             VStack(alignment: .center, spacing: 4) {
                 Text("Untunnel")
@@ -205,6 +235,8 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
             .listRowBackground(Color.clear)
+        } header: {
+            Text("À propos")
         }
     }
 

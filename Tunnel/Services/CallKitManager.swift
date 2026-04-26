@@ -32,7 +32,9 @@ enum CallKitReportSkipped: LocalizedError {
 ///     We never receive remote VoIP pushes.
 ///  3. `CXHandle.type = .generic` — never `.phoneNumber`.
 ///  4. `includesCallsInRecents = false` — nothing lands in the Phone app.
-///  5. `ringtoneSound` left unset — the user's system ringtone plays.
+///  5. `ringtoneSound` nil — sonnerie **système** (comme un vrai appel). Le
+///     volume est uniquement celui de la sonnerie iOS ; aucune API publique ne
+///     permet d’imposer un niveau plus fort depuis l’app.
 ///  6. No `provider(_:didActivate:)` — we never route audio through the
 ///     CallKit session.
 ///  7. No persistence of UUIDs or call history — `currentCallUUID` is
@@ -67,7 +69,7 @@ final class CallKitManager: NSObject {
         config.maximumCallsPerCallGroup = 1
         config.maximumCallGroups = 1
         config.includesCallsInRecents = false               // rule 4
-        // ringtoneSound intentionally left nil             // rule 5
+        // ringtoneSound intentionally nil — default system ringtone (rule 5)
         self.provider = CXProvider(configuration: config)
         super.init()
         self.provider.setDelegate(self, queue: nil)

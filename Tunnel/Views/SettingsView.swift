@@ -190,14 +190,13 @@ struct SettingsView: View {
 
             RingerVolumeNumberedSteps(steps: RingerVolumeGuide.steps)
 
-            Link(destination: RingerVolumeGuide.appleSupportURL) {
-                Label("Aide Apple : volume et sonnerie", systemImage: "safari")
-            }
+            RingerVolumeSystemLinks()
         } header: {
             Label("Son", systemImage: "speaker.wave.2.fill")
         } footer: {
             Text(
-                "Même sonnerie qu’un appel réel. Untunnel ne peut pas régler ce volume à ta place : tout se fait dans les Réglages iPhone, étapes ci-dessus."
+                "Même sonnerie qu’un appel réel. Untunnel ne peut pas régler ce volume à ta place. "
+                + "Les boutons ci-dessus ouvrent l’app Réglages ou Raccourcis quand iOS l’autorise ; sinon suis les étapes ou le lien Safari."
             )
         }
     }

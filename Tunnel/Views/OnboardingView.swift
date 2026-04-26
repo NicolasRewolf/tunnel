@@ -59,11 +59,8 @@ struct OnboardingView: View {
                 featured: true
             )
 
-            Link(destination: RingerVolumeGuide.appleSupportURL) {
-                Label("Aide Apple : volume et sonnerie", systemImage: "safari")
-                    .font(.subheadline.weight(.medium))
-            }
-            .padding(.horizontal, 4)
+            RingerVolumeSystemLinks()
+                .padding(.horizontal, 4)
         }
     }
 

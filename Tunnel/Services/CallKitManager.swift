@@ -1,5 +1,21 @@
 import CallKit
+import Foundation
 import OSLog
+
+/// User-action skips before CallKit is contacted (not CX errors).
+enum CallKitReportSkipped: LocalizedError {
+    case debounced
+    case callAlreadyActive
+
+    var errorDescription: String? {
+        switch self {
+        case .debounced:
+            return "Attends une seconde avant de relancer."
+        case .callAlreadyActive:
+            return "Un faux appel est déjà en cours. Raccroche d’abord ou attends la fin."
+        }
+    }
+}
 
 /// Single entry point for every CallKit interaction in Tunnel.
 /// Compartmentalized by design: nothing else in the app imports CallKit.
@@ -63,20 +79,18 @@ final class CallKitManager: NSObject {
     /// CallKit takes over: native incoming-call UI (lock screen OK),
     /// system ringtone, vibration.
     ///
-    /// Debounced: two calls < 1s apart collapse to one. If a call is already
-    /// active (tracked via `currentCallUUID`), the request is skipped — the
-    /// existing CallKit UI is still up.
+    /// Debounced: two attempts &lt; 1s apart throw `CallKitReportSkipped.debounced`.
+    /// If a call is already active (`currentCallUUID`), throws `.callAlreadyActive`.
     func reportIncomingCall(contactName: String) async throws {
         let now = Date()
         guard now.timeIntervalSince(lastReportAt) >= Self.minReportInterval else {
             logger.info("Debounced rapid-fire incoming call")
-            return
+            throw CallKitReportSkipped.debounced
         }
         guard currentCallUUID == nil else {
             logger.info("Ignored trigger: a call is already in progress")
-            return
+            throw CallKitReportSkipped.callAlreadyActive
         }
-        lastReportAt = now
 
         let uuid = UUID()
         let update = CXCallUpdate()
@@ -90,6 +104,7 @@ final class CallKitManager: NSObject {
 
         try await provider.reportNewIncomingCall(with: uuid, update: update)
         currentCallUUID = uuid                                              // rule 7: in-memory only
+        lastReportAt = Date()
         logger.info("CallKit accepted incoming call \(uuid, privacy: .public)")
     }
 
@@ -98,6 +113,10 @@ final class CallKitManager: NSObject {
     /// only needs a one-liner the user can act on.
     /// Static so other layers can call it without importing CallKit.
     nonisolated static func userFacingMessage(for error: Error) -> String {
+        if let skipped = error as? CallKitReportSkipped {
+            return skipped.errorDescription
+                ?? "Action impossible pour le moment."
+        }
         let ns = error as NSError
         if ns.domain == CXErrorDomainIncomingCall,
            let code = CXErrorCodeIncomingCallError.Code(rawValue: ns.code) {

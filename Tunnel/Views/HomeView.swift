@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Home screen: hero icon, name, primary CTA (or armed-timer cancel),
-/// secondary Raccourcis/Réglages buttons.
+/// secondary Raccourcis / Réglages.
 ///
 /// Two states drive the layout, both read from `AppState.armedDeadline`:
 ///  - **Idle** — timer button (circular glass) + "Sortir du tunnel" CTA.
@@ -304,7 +304,7 @@ private struct TimerPickerSheet: View {
             VStack(spacing: 6) {
                 Text("Déclencher dans…")
                     .font(.title2.weight(.semibold))
-                Text("Garde Untunnel ouvert pendant l'attente.")
+                Text("Une notification te préviendra à l’heure dite. Tu peux verrouiller l’iPhone ; touche la notification pour lancer le faux appel.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

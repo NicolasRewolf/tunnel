@@ -19,9 +19,15 @@ struct TriggerTunnelIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        try await CallKitManager.shared.reportIncomingCall(
-            contactName: AppState.shared.config.contactName
-        )
-        return .result()
+        do {
+            try await CallKitManager.shared.reportIncomingCall(
+                contactName: AppState.shared.config.contactName
+            )
+            return .result()
+        } catch {
+            // Même libellés que le bouton d’accueil : toast au prochain retour dans l’app.
+            AppState.shared.lastTriggerError = CallKitManager.userFacingMessage(for: error)
+            throw error
+        }
     }
 }

@@ -35,10 +35,9 @@ final class AppState {
     /// Absolute wall-clock instant at which an armed timer will fire.
     /// `nil` means no timer is currently armed.
     ///
-    /// **Known limit:** if iOS suspends or terminates the app before the
-    /// deadline, the firing is lost. Keeping the screen awake via
-    /// `recomputeKeepAwake()` mitigates suspension as long as the user does
-    /// not swipe the app away or lock the device manually.
+    /// Persistence + a local notification at `deadline` cover kill / lock: the
+    /// user can tap the notification to run the same CallKit path. If the app
+    /// stays alive, the in-process `Task` fires and cancels that notification.
     private(set) var armedDeadline: Date?
 
     /// Original duration the timer was armed with, in seconds. Used by the
@@ -50,6 +49,7 @@ final class AppState {
 
     private init() {
         config = Self.loadConfig()
+        restoreArmedTimerFromStorageIfNeeded()
     }
 
     // MARK: - Call lifecycle (CallKit-backed)
@@ -97,28 +97,18 @@ final class AppState {
     // MARK: - Armed timer API
 
     /// Schedules a fake call `duration` seconds from now. If a timer is
-    /// already armed, it is replaced. Keeps the screen awake for the whole
-    /// window to keep the app in foreground (our only insurance against
-    /// iOS suspending us before the deadline).
+    /// already armed, it is replaced.
     func armTimer(duration: TimeInterval) {
         disarmTimer()
         let deadline = Date.now.addingTimeInterval(duration)
         armedTotalDuration = duration
         armedDeadline = deadline
+        Self.persistArmedTimer(deadline: deadline, totalDuration: duration)
         recomputeKeepAwake()
-
-        armedTimerTask = Task { @MainActor [weak self] in
-            let remaining = deadline.timeIntervalSinceNow
-            if remaining > 0 {
-                try? await Task.sleep(for: .seconds(remaining))
-            }
-            guard let self, !Task.isCancelled else { return }
-            // Clear state first so the UI transitions back to idle *before*
-            // CallKit takes over the incoming-call UI.
-            self.armedDeadline = nil
-            self.armedTotalDuration = 0
-            self.recomputeKeepAwake()
-            self.triggerFakeCallNow()
+        startArmedTimerTask(until: deadline)
+        Task {
+            await ArmedTimerNotificationScheduler.requestAuthorizationIfNeeded()
+            await ArmedTimerNotificationScheduler.schedule(at: deadline)
         }
     }
 
@@ -126,9 +116,18 @@ final class AppState {
     func disarmTimer() {
         armedTimerTask?.cancel()
         armedTimerTask = nil
+        ArmedTimerNotificationScheduler.cancel()
+        Self.clearArmedTimerPersistence()
         armedDeadline = nil
         armedTotalDuration = 0
         recomputeKeepAwake()
+    }
+
+    /// User tapped the scheduled local notification (app may have been killed).
+    func userTappedArmedTimerNotification() {
+        disarmTimer()
+        lastTriggerError = nil
+        triggerFakeCallNow()
     }
 
     // MARK: - Navigation
@@ -143,6 +142,59 @@ final class AppState {
 
     func openOnboarding() {
         screen = .onboarding
+    }
+
+    // MARK: - Armed timer internals
+
+    private func restoreArmedTimerFromStorageIfNeeded() {
+        guard let ts = UserDefaults.standard.object(forKey: StorageKeys.armedDeadline) as? TimeInterval else {
+            return
+        }
+        let deadline = Date(timeIntervalSince1970: ts)
+        guard deadline > Date.now else {
+            Self.clearArmedTimerPersistence()
+            ArmedTimerNotificationScheduler.cancel()
+            return
+        }
+
+        var total = UserDefaults.standard.double(forKey: StorageKeys.armedTotalDuration)
+        if total <= 0 {
+            total = max(deadline.timeIntervalSinceNow, 60)
+            Self.persistArmedTimer(deadline: deadline, totalDuration: total)
+        }
+
+        armedTotalDuration = total
+        armedDeadline = deadline
+        recomputeKeepAwake()
+        startArmedTimerTask(until: deadline)
+        Task {
+            await ArmedTimerNotificationScheduler.requestAuthorizationIfNeeded()
+            await ArmedTimerNotificationScheduler.schedule(at: deadline)
+        }
+    }
+
+    private func startArmedTimerTask(until deadline: Date) {
+        armedTimerTask?.cancel()
+        armedTimerTask = Task { @MainActor [weak self] in
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining > 0 {
+                let ns = min(remaining * 1_000_000_000, Double(UInt64.max))
+                let nanos = UInt64(max(0, ns))
+                if nanos > 0 { try? await Task.sleep(nanoseconds: nanos) }
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.finishArmedTimerFromSleep()
+        }
+    }
+
+    private func finishArmedTimerFromSleep() {
+        armedTimerTask = nil
+        ArmedTimerNotificationScheduler.cancel()
+        Self.clearArmedTimerPersistence()
+        armedDeadline = nil
+        armedTotalDuration = 0
+        recomputeKeepAwake()
+        triggerFakeCallNow()
     }
 
     // MARK: - Private
@@ -170,8 +222,20 @@ final class AppState {
         }
         return config
     }
+
+    private static func persistArmedTimer(deadline: Date, totalDuration: TimeInterval) {
+        UserDefaults.standard.set(deadline.timeIntervalSince1970, forKey: StorageKeys.armedDeadline)
+        UserDefaults.standard.set(totalDuration, forKey: StorageKeys.armedTotalDuration)
+    }
+
+    private static func clearArmedTimerPersistence() {
+        UserDefaults.standard.removeObject(forKey: StorageKeys.armedDeadline)
+        UserDefaults.standard.removeObject(forKey: StorageKeys.armedTotalDuration)
+    }
 }
 
 private enum StorageKeys {
     static let config = "app.config"
+    static let armedDeadline = "app.armedDeadline"
+    static let armedTotalDuration = "app.armedTotalDuration"
 }

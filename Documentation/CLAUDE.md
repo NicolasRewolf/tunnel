@@ -10,9 +10,22 @@ App iOS qui déclenche un **faux appel entrant** (CallKit) pour sortir d’une c
 
 - **Swift + SwiftUI**, `@Observable` (`AppState`).
 - **iOS déploiement** : 26.0 (voir `project.pbxproj`).
-- **CallKit** : uniquement dans `Tunnel/Services/CallKitManager.swift` (`import CallKit` nulle part ailleurs).
+- **CallKit** : uniquement dans `Tunnel/Core/Services/CallKitManager.swift` (`import CallKit` nulle part ailleurs).
 - **App Intents** : `TriggerTunnelIntent` + `TunnelAppShortcuts` (Raccourcis, Back Tap, Action Button).
 - **Persistance** : `FakeCallConfig` (Codable) dans `UserDefaults`.
+
+## Structure du module `Tunnel/`
+
+| Dossier | Rôle |
+|---------|------|
+| `App/` | Point d’entrée : `@main`, `AppDelegate`, routage `ContentView` |
+| `Core/Models/` | `AppState`, `FakeCallConfig` |
+| `Core/Services/` | `CallKitManager`, `ArmedTimerNotificationScheduler` (effets de bord isolés) |
+| `Intents/` | App Intents (raccourcis système) |
+| `Features/*/` | Écrans par domaine (Home, Onboarding, InCall, Settings, Privacy) |
+| `Support/` | Guides partagés (`RingerVolumeGuide`), `Extensions/` |
+| `UI/` | Thème / tokens visuels (`Theme`) |
+| `Assets.xcassets`, `Info.plist`, `PrivacyInfo.xcprivacy` | Ressources bundle |
 
 ## Flux principaux
 
@@ -29,21 +42,21 @@ App iOS qui déclenche un **faux appel entrant** (CallKit) pour sortir d’une c
 
 ## Limites produit documentées dans le code
 
-- **Matrice de déclenchement (fiabilité, scénarios, pourquoi pas 100 %)** : `Ressources/TriggerScenarios.md`
+- **Matrice de déclenchement (fiabilité, scénarios, pourquoi pas 100 %)** : `Documentation/TriggerScenarios.md`
 - **Minuteur armé** : date + durée sont persistées (`UserDefaults`) ; une **notification locale** à l’échéance permet de lancer le faux appel après un tap (app tuée ou en arrière-plan possible). Sans autorisation notifications, seul le `Task` in-app déclenche — l’utilisateur doit accepter les alertes pour le filet complet.
 - **CallKit** : à tester sur **appareil physique** (simulateur non fiable pour ce flux).
 - **Échec d’intention (raccourci)** : `AppState.recordIntentTriggerFailure` persiste le message — toast `HomeView` à la prochaine ouverture.
 
-## Fichiers utiles
+## Fichiers utiles (chemins actuels)
 
 | Fichier | Rôle |
 |--------|------|
-| `TunnelApp.swift` | Warm-up `CallKitManager.shared` au lancement |
-| `ContentView.swift` | Route `home` / `onboarding` / `inCall` / `settings` |
-| `Models/AppState.swift` | Écran, config, timer armé, callbacks CallKit |
-| `Services/CallKitManager.swift` | Tout CallKit |
-| `Intents/TriggerTunnelIntent.swift` | Action système |
-| `Views/InCallView.swift` | Après décrochage |
+| `Tunnel/App/TunnelApp.swift` | Warm-up `CallKitManager.shared` au lancement |
+| `Tunnel/App/ContentView.swift` | Route `home` / `onboarding` / `inCall` / `settings` |
+| `Tunnel/Core/Models/AppState.swift` | Écran, config, timer armé, callbacks CallKit |
+| `Tunnel/Core/Services/CallKitManager.swift` | Tout CallKit |
+| `Tunnel/Intents/TriggerTunnelIntent.swift` | Action système |
+| `Tunnel/Features/InCall/InCallView.swift` | Après décrochage |
 
 ## Règles de travail (code)
 

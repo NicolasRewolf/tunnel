@@ -28,11 +28,11 @@ playground.xcworkspace
 
 # ─── Design sources (heavy binaries) ──────────────────────
 ## Photoshop working files >100MB are rejected by GitHub
-Ressources/Image/*.psd
-Ressources/Image/*.psb
+Design/Image/*.psd
+Design/Image/*.psb
 
 ## Ableton project folder + analysis/cache files
-Ressources/Ringtones/RING TONES Project/
+Design/Ringtones/RING TONES Project/
 *.asd
 
 # ─── Adobe / temp files ───────────────────────────────────

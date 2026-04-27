@@ -171,7 +171,7 @@ struct HomeView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .task(id: message) {
                     try? await Task.sleep(for: .seconds(3))
-                    appState.lastTriggerError = nil
+                    appState.acknowledgeTriggerError()
                 }
         }
     }

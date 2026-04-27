@@ -58,9 +58,6 @@ struct OnboardingView: View {
                 steps: RingerVolumeGuide.steps,
                 featured: true
             )
-
-            RingerVolumeSystemLinks()
-                .padding(.horizontal, 4)
         }
     }
 

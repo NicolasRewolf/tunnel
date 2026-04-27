@@ -50,6 +50,7 @@ final class AppState {
     private init() {
         config = Self.loadConfig()
         restoreArmedTimerFromStorageIfNeeded()
+        restorePendingTriggerErrorFromStorage()
     }
 
     // MARK: - Call lifecycle (CallKit-backed)
@@ -58,7 +59,7 @@ final class AppState {
     /// when its deadline is reached). Delegates to CallKit so the incoming
     /// UI is consistent with the Back Tap / Action Button / Shortcut paths.
     func triggerFakeCallNow() {
-        lastTriggerError = nil
+        acknowledgeTriggerError()
         Task { [logger, config, weak self] in
             do {
                 try await CallKitManager.shared.reportIncomingCall(
@@ -126,7 +127,6 @@ final class AppState {
     /// User tapped the scheduled local notification (app may have been killed).
     func userTappedArmedTimerNotification() {
         disarmTimer()
-        lastTriggerError = nil
         triggerFakeCallNow()
     }
 
@@ -142,6 +142,27 @@ final class AppState {
 
     func openOnboarding() {
         screen = .onboarding
+    }
+
+    // MARK: - Erreurs de déclenchement (raccourci = pas de toast si app inactive)
+
+    /// Raccourci / Siri : mémorise l’échec pour l’afficher à la prochaine ouverture d’`HomeView`.
+    func recordIntentTriggerFailure(_ message: String) {
+        lastTriggerError = message
+        UserDefaults.standard.set(message, forKey: StorageKeys.pendingIntentTriggerError)
+    }
+
+    /// Dismiss explicite du bandeau d’erreur (incl. stockage persistant).
+    func acknowledgeTriggerError() {
+        lastTriggerError = nil
+        UserDefaults.standard.removeObject(forKey: StorageKeys.pendingIntentTriggerError)
+    }
+
+    private func restorePendingTriggerErrorFromStorage() {
+        guard let s = UserDefaults.standard.string(forKey: StorageKeys.pendingIntentTriggerError),
+              !s.isEmpty
+        else { return }
+        lastTriggerError = s
     }
 
     // MARK: - Armed timer internals
@@ -238,4 +259,5 @@ private enum StorageKeys {
     static let config = "app.config"
     static let armedDeadline = "app.armedDeadline"
     static let armedTotalDuration = "app.armedTotalDuration"
+    static let pendingIntentTriggerError = "app.pendingIntentTriggerError"
 }

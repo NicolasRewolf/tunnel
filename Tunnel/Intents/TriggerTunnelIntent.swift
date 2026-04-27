@@ -25,8 +25,10 @@ struct TriggerTunnelIntent: AppIntent {
             )
             return .result()
         } catch {
-            // Même libellés que le bouton d’accueil : toast au prochain retour dans l’app.
-            AppState.shared.lastTriggerError = CallKitManager.userFacingMessage(for: error)
+            // Même libellés que le bouton d’accueil. Persistance si l’app n’était pas au 1er plan
+            // (Raccourcis n’affiche que parfois le détail — voir Ressources/TriggerScenarios.md).
+            let message = CallKitManager.userFacingMessage(for: error)
+            AppState.shared.recordIntentTriggerFailure(message)
             throw error
         }
     }

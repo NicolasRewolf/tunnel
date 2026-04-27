@@ -29,8 +29,10 @@ App iOS qui déclenche un **faux appel entrant** (CallKit) pour sortir d’une c
 
 ## Limites produit documentées dans le code
 
+- **Matrice de déclenchement (fiabilité, scénarios, pourquoi pas 100 %)** : `Ressources/TriggerScenarios.md`
 - **Minuteur armé** : date + durée sont persistées (`UserDefaults`) ; une **notification locale** à l’échéance permet de lancer le faux appel après un tap (app tuée ou en arrière-plan possible). Sans autorisation notifications, seul le `Task` in-app déclenche — l’utilisateur doit accepter les alertes pour le filet complet.
 - **CallKit** : à tester sur **appareil physique** (simulateur non fiable pour ce flux).
+- **Échec d’intention (raccourci)** : `AppState.recordIntentTriggerFailure` persiste le message — toast `HomeView` à la prochaine ouverture.
 
 ## Fichiers utiles
 

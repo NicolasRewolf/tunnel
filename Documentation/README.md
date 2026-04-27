@@ -1,6 +1,7 @@
 # Documentation
 
-- **`CLAUDE.md`** — Pile technique, règles d’évolution du code, chemins des fichiers.
+- **`CLAUDE.md`** — Pile technique, règles d’évolution du code, chemins des fichiers, rituel doc.
+- **`ReleaseChecklist.md`** — Smoke tests sur iPhone et rituel de mise à jour doc avant release.
 - **`TriggerScenarios.md`** — Matrice de déclenchement / limites iOS.
 - **`MirofishSeed.md`** — Brouillon / idées.
 

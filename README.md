@@ -21,7 +21,7 @@ Cible : **Tunnel** (bundle `rewolf.Tunnel`, nom affiché *Untunnel*).
 | Emplacement | Contenu |
 |-------------|---------|
 | `Tunnel/` | Source Swift, assets, plist — **seul ce dossier** est la cible Xcode (synchronisée) |
-| `Documentation/` | Notes projet (`CLAUDE.md`), matrice de scénarios, brouillons |
+| `Documentation/` | Notes projet (`CLAUDE.md`), matrice de scénarios, [checklist release](Documentation/ReleaseChecklist.md) |
 | `Design/` | Fichiers hors bundle : mockups, sources logo, extraits son (non requis pour compiler) |
 
 ## Règles d’architecture (résumé)
@@ -30,3 +30,13 @@ Cible : **Tunnel** (bundle `rewolf.Tunnel`, nom affiché *Untunnel*).
 - **Écrans** : `Tunnel/Features/<écran>/`
 - **État + config** : `Tunnel/Core/Models/`
 - Détails : `Documentation/CLAUDE.md`
+
+## Tests (Xcode)
+
+Avec un simulateur iOS 26 (ex. *iPhone 17*) :
+
+```bash
+xcodebuild -scheme Tunnel -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
+
+Cible de tests : **TunnelTests** (mapping d’erreurs `CallKitManager` sans mocker le daemon).

@@ -57,9 +57,20 @@ App iOS qui déclenche un **faux appel entrant** (CallKit) pour sortir d’une c
 | `Tunnel/Core/Services/CallKitManager.swift` | Tout CallKit |
 | `Tunnel/Intents/TriggerTunnelIntent.swift` | Action système |
 | `Tunnel/Features/InCall/InCallView.swift` | Après décrochage |
+| `TunnelTests/CallKitErrorMappingTests.swift` | Non-régression des messages d’erreur (mapping sans CallKit live) |
 
 ## Règles de travail (code)
 
 - Ne pas étendre CallKit hors `CallKitManager.swift`.
 - Garder `TriggerTunnelIntent.openAppWhenRun = false` sauf décision produit explicite.
 - Préférer `Logger` (OSLog) à `print`.
+
+## Rituel de documentation (après changement de flux / erreurs)
+
+Si tu modifies le chemin d’un déclenchement (CallKit, App Intents) ou le **comportement vu par l’utilisateur** (nouveau cas d’échec, texte) :
+
+1. Mettre à jour [Documentation/TriggerScenarios.md](TriggerScenarios.md) si un scénario de fiabilité change.
+2. Mettre à jour la section **CallKit** ou **Limites** ci-dessus si l’explication n’est plus exacte.
+3. Aligner [Documentation/ReleaseChecklist.md](ReleaseChecklist.md) si un scénario smoke manque ou change.
+
+*Pour un refactor interne sans changement de comportement : un build suffit, pas forcément relecture des trois docs.*

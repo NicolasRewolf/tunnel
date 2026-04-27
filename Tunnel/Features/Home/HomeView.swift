@@ -29,6 +29,8 @@ struct HomeView: View {
                     Text("Tunnel")
                         .font(.largeTitle.weight(.bold))
                         .tracking(-0.8)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityLabel("Untunnel")
 
                     subtitle
                 }
@@ -230,6 +232,8 @@ struct HomeView: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .onAppear { pulseRing = true }
+        // L’icône redondante avec les libellés d’action ; on évite la répétition en VoiceOver.
+        .accessibilityHidden(true)
     }
 
     private var pulseRings: some View {
@@ -304,6 +308,7 @@ private struct TimerPickerSheet: View {
             VStack(spacing: 6) {
                 Text("Déclencher dans…")
                     .font(.title2.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
                 Text("Une notification te préviendra à l’heure dite. Tu peux verrouiller l’iPhone ; touche la notification pour lancer le faux appel.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -356,6 +361,7 @@ private struct ErrorToast: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.red)
                 .padding(.top, 1)
+                .accessibilityHidden(true)
 
             Text(message)
                 .font(.subheadline.weight(.medium))
@@ -368,7 +374,7 @@ private struct ErrorToast: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .glassEffect(.regular, in: .rect(cornerRadius: 14))
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isStaticText)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Erreur. \(message)")
     }
 }

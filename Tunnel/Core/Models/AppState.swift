@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OSLog
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -21,8 +22,64 @@ final class AppState {
         didSet { recomputeKeepAwake() }
     }
 
-    var config: FakeCallConfig {
-        didSet { persistConfig() }
+    var profilesState: ProfilesState {
+        didSet { persistProfilesState() }
+    }
+
+    /// Convenience access for view layers that only care about the active profile.
+    /// Setting writes back into `profilesState` (and persists).
+    var activeProfile: CallProfile {
+        get {
+            profilesState.activeProfile ?? profilesState.profiles.first ?? CallProfile()
+        }
+        set {
+            var next = profilesState
+            next.upsertProfile(newValue)
+            next.setActiveProfile(id: newValue.id)
+            profilesState = next
+        }
+    }
+
+    // MARK: - Profiles API (UI helpers)
+
+    func setActiveProfile(id: UUID) {
+        var next = profilesState
+        next.setActiveProfile(id: id)
+        profilesState = next
+    }
+
+    func addProfile(_ profile: CallProfile) {
+        var next = profilesState
+        next.upsertProfile(profile)
+        profilesState = next
+    }
+
+    func duplicateProfile(id: UUID) {
+        guard let existing = profilesState.profiles.first(where: { $0.id == id }) else { return }
+        var copy = existing
+        copy.id = UUID()
+        var next = profilesState
+        next.profiles.append(copy)
+        profilesState = next
+    }
+
+    func deleteProfiles(at offsets: IndexSet) {
+        var next = profilesState
+        next.profiles.remove(atOffsets: offsets)
+
+        if next.profiles.isEmpty {
+            let fallback = CallProfile()
+            next = ProfilesState(single: fallback)
+        } else if !next.profiles.contains(where: { $0.id == next.activeProfileID }) {
+            next.activeProfileID = next.profiles[0].id
+        }
+
+        profilesState = next
+    }
+
+    func deleteProfile(id: UUID) {
+        guard let idx = profilesState.profiles.firstIndex(where: { $0.id == id }) else { return }
+        deleteProfiles(at: IndexSet(integer: idx))
     }
 
     /// Last user-facing error from a trigger attempt (e.g. CallKit refused the
@@ -48,7 +105,7 @@ final class AppState {
     private var armedTimerTask: Task<Void, Never>?
 
     private init() {
-        config = Self.loadConfig()
+        profilesState = Self.loadOrMigrateProfilesState()
         restoreArmedTimerFromStorageIfNeeded()
         restorePendingTriggerErrorFromStorage()
     }
@@ -60,10 +117,11 @@ final class AppState {
     /// UI is consistent with the Back Tap / Action Button / Shortcut paths.
     func triggerFakeCallNow() {
         acknowledgeTriggerError()
-        Task { [logger, config, weak self] in
+        Task { [logger, weak self] in
             do {
+                let contactName = await MainActor.run { AppState.shared.activeProfile.contactName }
                 try await CallKitManager.shared.reportIncomingCall(
-                    contactName: config.contactName
+                    contactName: contactName
                 )
             } catch {
                 logger.error(
@@ -229,19 +287,130 @@ final class AppState {
 
     // MARK: - Persistence
 
-    private func persistConfig() {
-        guard let data = try? JSONEncoder().encode(config) else { return }
-        UserDefaults.standard.set(data, forKey: StorageKeys.config)
+    private func persistProfilesState() {
+        guard let data = try? JSONEncoder().encode(profilesState) else { return }
+        UserDefaults.standard.set(data, forKey: StorageKeys.callProfiles)
     }
 
-    private static func loadConfig() -> FakeCallConfig {
+    private static func loadLegacyConfig() -> FakeCallConfig? {
         guard
             let data = UserDefaults.standard.data(forKey: StorageKeys.config),
             let config = try? JSONDecoder().decode(FakeCallConfig.self, from: data)
         else {
-            return FakeCallConfig()
+            return nil
         }
         return config
+    }
+
+    private static func loadOrMigrateProfilesState() -> ProfilesState {
+        if let data = UserDefaults.standard.data(forKey: StorageKeys.callProfiles),
+           let state = try? JSONDecoder().decode(ProfilesState.self, from: data),
+           !state.profiles.isEmpty {
+            return state
+        }
+
+        if let legacy = loadLegacyConfig() {
+            // Migration: older versions stored a single `FakeCallConfig` at `app.config`.
+            var initial = CallProfile()
+            initial.contactName = legacy.contactName
+            initial.contactSubtitle = legacy.contactSubtitle
+            initial.contactImageData = legacy.contactImageData
+
+            let migrated = ProfilesState(single: initial)
+            if let data = try? JSONEncoder().encode(migrated) {
+                UserDefaults.standard.set(data, forKey: StorageKeys.callProfiles)
+            }
+            return migrated
+        }
+
+        // Fresh install: bootstrap a few starter profiles.
+        let starters: [CallProfile] = [
+            seededProfile(
+                name: "Crèche",
+                subtitle: "Portable",
+                symbol: "building.2.fill",
+                colors: (UIColor.systemTeal, UIColor.systemBlue)
+            ),
+            seededProfile(
+                name: "Ehpad",
+                subtitle: "Portable",
+                symbol: "cross.case.fill",
+                colors: (UIColor.systemPink, UIColor.systemRed)
+            ),
+            seededProfile(
+                name: "Astreinte",
+                subtitle: "Portable",
+                symbol: "person.badge.clock.fill",
+                colors: (UIColor.systemIndigo, UIColor.systemPurple)
+            ),
+        ]
+
+        let seeded = ProfilesState(profiles: starters, activeProfileID: starters[0].id)
+        if let data = try? JSONEncoder().encode(seeded) {
+            UserDefaults.standard.set(data, forKey: StorageKeys.callProfiles)
+        }
+        return seeded
+    }
+
+    private static func seededProfile(
+        name: String,
+        subtitle: String,
+        symbol: String,
+        colors: (UIColor, UIColor)
+    ) -> CallProfile {
+        var p = CallProfile()
+        p.contactName = name
+        p.contactSubtitle = subtitle
+        p.contactImageData = seededAvatarJPEGData(symbol: symbol, colors: colors)
+        return p
+    }
+
+    private static func seededAvatarJPEGData(
+        symbol: String,
+        colors: (UIColor, UIColor)
+    ) -> Data? {
+        let size = CGSize(width: 600, height: 600)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { ctx in
+            // Background gradient
+            let cgColors = [colors.0.cgColor, colors.1.cgColor] as CFArray
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            if let gradient = CGGradient(colorsSpace: colorSpace, colors: cgColors, locations: [0, 1]) {
+                ctx.cgContext.drawLinearGradient(
+                    gradient,
+                    start: CGPoint(x: 0, y: 0),
+                    end: CGPoint(x: size.width, y: size.height),
+                    options: []
+                )
+            } else {
+                colors.0.setFill()
+                ctx.fill(CGRect(origin: .zero, size: size))
+            }
+
+            // Subtle vignette
+            UIColor.black.withAlphaComponent(0.12).setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(x: -120, y: -80, width: 520, height: 520))
+            UIColor.black.withAlphaComponent(0.18).setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(x: 220, y: 260, width: 560, height: 560))
+
+            // Symbol
+            let pointSize: CGFloat = 250
+            let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
+            let symbolImage = UIImage(systemName: symbol, withConfiguration: config)
+            let tint = UIColor.white.withAlphaComponent(0.95)
+            let rendered = symbolImage?.withTintColor(tint, renderingMode: .alwaysOriginal)
+
+            if let rendered {
+                let rect = CGRect(
+                    x: (size.width - pointSize) / 2,
+                    y: (size.height - pointSize) / 2,
+                    width: pointSize,
+                    height: pointSize
+                )
+                rendered.draw(in: rect)
+            }
+        }
+        return image.jpegData(compressionQuality: 0.90)
     }
 
     private static func persistArmedTimer(deadline: Date, totalDuration: TimeInterval) {
@@ -257,6 +426,7 @@ final class AppState {
 
 private enum StorageKeys {
     static let config = "app.config"
+    static let callProfiles = "app.callProfiles"
     static let armedDeadline = "app.armedDeadline"
     static let armedTotalDuration = "app.armedTotalDuration"
     static let pendingIntentTriggerError = "app.pendingIntentTriggerError"

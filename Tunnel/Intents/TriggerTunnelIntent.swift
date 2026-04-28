@@ -21,7 +21,7 @@ struct TriggerTunnelIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         do {
             try await CallKitManager.shared.reportIncomingCall(
-                contactName: AppState.shared.config.contactName
+                contactName: AppState.shared.activeProfile.contactName
             )
             return .result()
         } catch {

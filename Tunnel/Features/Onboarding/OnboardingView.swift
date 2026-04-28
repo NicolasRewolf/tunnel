@@ -67,11 +67,12 @@ struct OnboardingView: View {
         MethodCard(
             icon: "hand.tap.fill",
             label: "Toucher au dos",
-            description: "Tapote 2 ou 3 fois l'arrière de ton iPhone. Le geste le plus invisible.",
+            description: "Tapote 2 ou 3 fois l'arrière de ton iPhone. Le geste le plus invisible (mais pas toujours disponible iPhone verrouillé).",
             steps: [
                 "Réglages › Accessibilité › Toucher › Toucher au dos",
                 "Double toucher ou Triple toucher",
-                "Raccourci › Déclencher Tunnel"
+                "Raccourci › Déclencher Tunnel",
+                "Si ça ne se lance pas écran verrouillé : utilise plutôt le Bouton Action, Siri, ou le minuteur + notification."
             ],
             featured: true
         )

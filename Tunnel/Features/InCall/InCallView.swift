@@ -62,7 +62,7 @@ struct InCallView: View {
 
     @ViewBuilder
     private var backgroundLayer: some View {
-        if let data = appState.config.contactImageData,
+        if let data = appState.activeProfile.contactImageData,
            let uiImage = UIImage(data: data) {
             // Color.black = vue "layout neutre" qui prend exactement la taille offerte
             // par le parent. Les overlays (image + gradient) sont CLIPPÉS à ses bounds,
@@ -106,7 +106,7 @@ struct InCallView: View {
                         .monospacedDigit()
                 }
 
-                Text(appState.config.contactName)
+                Text(appState.activeProfile.contactName)
                     .font(.system(size: nameFontSize, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -122,7 +122,7 @@ struct InCallView: View {
     @ViewBuilder
     private var contactAvatar: some View {
         Group {
-            if let data = appState.config.contactImageData,
+            if let data = appState.activeProfile.contactImageData,
                let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()

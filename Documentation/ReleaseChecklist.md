@@ -5,7 +5,7 @@
 | # | Scénario | OK |
 |---|----------|---|
 | 1 | Lancer le faux appel avec **Sortir du tunnel** (app au 1er plan) | [ ] |
-| 2 | Déverrouillé : **Raccourci** « Déclencher Untunnel » (Raccourcis / Touche au dos / Bouton Action selon config) | [ ] |
+| 2 | Déverrouillé : **Raccourci** « Déclencher Untunnel » (Raccourcis / Toucher au dos / Bouton Action selon config) | [ ] |
 | 3 | **Écran verrouillé** : même raccourci → l’**interface d’appel entrant** s’affiche (CallKit) | [ ] |
 | 4 | Sonnerie **haut** : vérifier que c’est entendu ou que le retour d’erreur a du sens (silencieux muet = voir guide volume) | [ ] |
 | 5 | (Optionnel) **Ne pas déranger** activé : un échec contrôlé / message d’erreur explicite est acceptable | [ ] |

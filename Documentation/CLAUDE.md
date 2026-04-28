@@ -35,6 +35,7 @@ App iOS qui déclenche un **faux appel entrant** (CallKit) pour sortir d’une c
 
 ## CallKit (résumé implémentation)
 
+- **Carte d’appel *avant* de décrocher (verrou, îlot, etc.)** : 100% **système** Apple. Le libellé type « nom de l’app + contexte (ex. audio) » vient **du bundle** / CallKit, pas d’une API pour le masquer ou le styler. On fournit seulement le **nom d’appel** (`contactName` via `CXCallUpdate`). L’`InCallView` (après décrochage) est la nôtre, sans reprendre ce libellé système.
 - `CXProviderConfiguration` : pas de vidéo, handle `.generic`, pas d’entrée dans l’historique Téléphone, pas de sonnerie custom dans le code.
 - **Pas** de routage audio (`didActivate` non implémenté — simulation locale).
 - Debounce ~1 s et garde **un** appel suivi (`currentCallUUID`) ; doubles déclenchements peuvent être **silencieux**.

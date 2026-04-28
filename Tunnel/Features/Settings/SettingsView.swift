@@ -1,23 +1,12 @@
-import OSLog
-import PhotosUI
 import SwiftUI
-import UIKit
 
 /// Réglages : ordre par importance — faux appel (aperçu, identité, photo), son, aide, à propos.
 struct SettingsView: View {
     @Bindable var appState: AppState
-    @State private var photoSelection: PhotosPickerItem?
     @State private var showPrivacyPolicy = false
-    @State private var subtitlePreset: SubtitlePreset = .portable
-
-    private let logger = Logger(subsystem: "rewolf.Tunnel", category: "SettingsView")
-
-    private static let avatarSize: CGFloat = 60
-    private static let previewAvatarSize: CGFloat = 52
-    private static let avatarMaxDimension: CGFloat = 600
 
     /// Raccourcis + entrée libre pour le sous-titre (fixe, portable…).
-    private enum SubtitlePreset: String, CaseIterable, Identifiable {
+    enum SubtitlePreset: String, CaseIterable, Identifiable {
         case portable
         case fixe
         case bureau
@@ -56,13 +45,14 @@ struct SettingsView: View {
         }
     }
 
+    private static let previewAvatarSize: CGFloat = 52
+
     var body: some View {
         NavigationStack {
             Form {
-                // 1 — le plus important : objectif + texte de l’appel (crédibilité)
+                activeProfileSection
+                manageProfilesSection
                 callPreviewSection
-                nameAndLineSection
-                photoSection
                 // 2 — entendre l’appel
                 soundSection
                 // 3 — déclencher, vie privée
@@ -78,24 +68,22 @@ struct SettingsView: View {
                     Button("Fermer") { appState.goHome() }
                         .accessibilityLabel("Fermer les réglages")
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        addProfile()
+                    } label: {
+                        Label("Ajouter", systemImage: "person.crop.circle.badge.plus")
+                    }
+                    .accessibilityLabel("Ajouter un profil")
+                }
             }
             .sheet(isPresented: $showPrivacyPolicy) {
                 PrivacyPolicyView()
             }
-            .onAppear {
-                subtitlePreset = SubtitlePreset.matching(appState.config.contactSubtitle)
-            }
-            .onChange(of: appState.config.contactSubtitle) { _, new in
-                subtitlePreset = SubtitlePreset.matching(new)
-            }
-            .onChange(of: photoSelection) { _, newValue in
-                guard let newValue else { return }
-                Task { await loadPickedPhoto(newValue) }
-            }
         }
     }
 
-    // MARK: - 1. Faux appel (le plus important)
+    // MARK: - 1. Aperçu
 
     private var callPreviewSection: some View {
         Section {
@@ -107,78 +95,89 @@ struct SettingsView: View {
         }
     }
 
-    private var nameAndLineSection: some View {
+    // MARK: - 0. Profil actif + gestion
+
+    private var activeProfileID: Binding<UUID> {
+        Binding(
+            get: { appState.profilesState.activeProfileID },
+            set: { newValue in appState.setActiveProfile(id: newValue) }
+        )
+    }
+
+    private var activeProfileSection: some View {
         Section {
-            TextField("", text: $appState.config.contactName, prompt: Text("ex. Léa Martin"))
-                .textContentType(.name)
-                .textInputAutocapitalization(.words)
-
-            Picker("Type de ligne", selection: $subtitlePreset) {
-                ForEach(SubtitlePreset.allCases.filter { $0 != .personnalise }) { preset in
-                    Text(preset.label).tag(preset)
+            Picker("Profil actif", selection: activeProfileID) {
+                ForEach(appState.profilesState.profiles) { profile in
+                    Text(profileDisplayName(profile)).tag(profile.id)
                 }
-                Text(SubtitlePreset.personnalise.label).tag(SubtitlePreset.personnalise)
-            }
-            .accessibilityLabel("Légende sous le nom, comme sur Téléphone")
-            .onChange(of: subtitlePreset) { _, new in
-                if new != .personnalise {
-                    appState.config.contactSubtitle = new.storedValue
-                }
-            }
-
-            if subtitlePreset == .personnalise {
-                TextField("", text: $appState.config.contactSubtitle, prompt: Text("ex. iPhone, Urgence"))
-                    .textInputAutocapitalization(.sentences)
             }
         } header: {
-            Text("Qui appelle ?")
+            Text("Profil actif")
         } footer: {
-            Text(
-                "C’est l’appât principal : un nom + une légende crédibles (comme sur un vrai appel : Fixe, Portable, etc.)."
-            )
+            Text("Le bouton déclenche toujours ce profil.")
         }
     }
 
-    private var photoSection: some View {
+    private var manageProfilesSection: some View {
         Section {
-            HStack(alignment: .center, spacing: 14) {
-                avatarPreview(large: true)
-                contactPhotoStack
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 4)
-        } header: {
-            Text("Photo")
-        } footer: {
-            Text("Optionnel mais utile : avatar sur l’appel et arrière-plan flouté. Tu peux rester en silhouette si tu préfères.")
-        }
-    }
-
-    /// Libellé et présence d’image sont lus ici (main actor) ; le `Label` du `PhotosPicker` ne capte qu’un `String` (Sendable).
-    private var contactPhotoStack: some View {
-        let hasImage = appState.config.contactImageData != nil
-        let pickerTitle = hasImage ? "Remplacer la photo" : "Choisir une photo"
-        return VStack(alignment: .leading, spacing: 8) {
-            PhotosPicker(
-                selection: $photoSelection,
-                matching: .images,
-                photoLibrary: .shared()
-            ) {
-                Label(pickerTitle, systemImage: "photo.on.rectangle.angled")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("Photo du contact pour l’aperçu et le fond flouté")
-
-            if hasImage {
-                Button("Retirer la photo", role: .destructive) {
-                    photoSelection = nil
-                    appState.config.contactImageData = nil
+            ForEach(appState.profilesState.profiles) { profile in
+                NavigationLink {
+                    ProfileEditorView(appState: appState, profileID: profile.id)
+                } label: {
+                    HStack(spacing: 12) {
+                        profileAvatar(profile)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(profileDisplayName(profile))
+                                .font(.body.weight(.medium))
+                                .lineLimit(1)
+                            let subtitle = profile.contactSubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !subtitle.isEmpty {
+                                Text(subtitle)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        if profile.id == appState.profilesState.activeProfileID {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .accessibilityHidden(true)
+                        }
+                    }
                 }
-                .font(.subheadline)
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    Button {
+                        appState.setActiveProfile(id: profile.id)
+                    } label: {
+                        Label("Activer", systemImage: "checkmark")
+                    }
+                    .tint(Color.accentColor)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        appState.duplicateProfile(id: profile.id)
+                    } label: {
+                        Label("Dupliquer", systemImage: "plus.square.on.square")
+                    }
+                    .tint(.indigo)
+
+                    Button(role: .destructive) {
+                        appState.deleteProfile(id: profile.id)
+                    } label: {
+                        Label("Supprimer", systemImage: "trash")
+                    }
+                }
             }
+            .onDelete(perform: appState.deleteProfiles)
+        } header: {
+            Text("Gérer les profils")
+        } footer: {
+            Text("Glisser à gauche pour activer, à droite pour dupliquer ou supprimer.")
         }
     }
+
 
     // MARK: - 2. Son
 
@@ -241,15 +240,39 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Helpers
+
+    private func navigationRow(
+        icon: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 24)
+                Text(label)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .foregroundStyle(.primary)
+        .accessibilityLabel(label)
+        .accessibilityHint("Ouvre \(label)")
+    }
+
     // MARK: - Preview card
 
     private var callPreviewCard: some View {
-        let name = appState.config.contactName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let caption = appState.config.contactSubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = appState.activeProfile.contactName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let caption = appState.activeProfile.contactSubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return HStack(alignment: .center, spacing: 14) {
             Group {
-                if let data = appState.config.contactImageData,
+                if let data = appState.activeProfile.contactImageData,
                    let uiImage = UIImage(data: data) {
                     Image(uiImage: uiImage)
                         .resizable()
@@ -309,35 +332,11 @@ struct SettingsView: View {
         .listRowBackground(Color.clear)
     }
 
-    // MARK: - Helpers
-
-    private func navigationRow(
-        icon: String,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 24)
-                Text(label)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .foregroundStyle(.primary)
-        .accessibilityLabel(label)
-        .accessibilityHint("Ouvre \(label)")
-    }
-
     @ViewBuilder
-    private func avatarPreview(large: Bool) -> some View {
-        let size = large ? Self.avatarSize : Self.previewAvatarSize
+    private func profileAvatar(_ profile: CallProfile) -> some View {
+        let size: CGFloat = 34
         Group {
-            if let data = appState.config.contactImageData,
+            if let data = profile.contactImageData,
                let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -346,7 +345,7 @@ struct SettingsView: View {
                 ZStack {
                     Color(.tertiarySystemFill)
                     Image(systemName: "person.fill")
-                        .font(.system(size: large ? 26 : 22))
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -355,28 +354,17 @@ struct SettingsView: View {
         .clipShape(Circle())
     }
 
-    // MARK: - Photo loading
+    private func profileDisplayName(_ profile: CallProfile) -> String {
+        let t = profile.contactName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? "Profil" : t
+    }
 
-    private func loadPickedPhoto(_ item: PhotosPickerItem) async {
-        do {
-            guard let rawData = try await item.loadTransferable(type: Data.self),
-                  let uiImage = UIImage(data: rawData) else {
-                logger.error("Could not decode picked photo into a UIImage.")
-                return
-            }
-
-            let resized = uiImage.resizedToFit(maxDimension: Self.avatarMaxDimension)
-            guard let jpegData = resized.jpegData(compressionQuality: 0.85) else {
-                logger.error("Could not encode contact photo to JPEG.")
-                return
-            }
-
-            await MainActor.run {
-                appState.config.contactImageData = jpegData
-            }
-        } catch {
-            logger.error("Failed to load picked photo: \(error.localizedDescription, privacy: .public)")
-        }
+    private func addProfile() {
+        var p = CallProfile()
+        p.contactName = "Nouveau profil"
+        p.contactSubtitle = "Portable"
+        appState.addProfile(p)
+        appState.setActiveProfile(id: p.id)
     }
 }
 

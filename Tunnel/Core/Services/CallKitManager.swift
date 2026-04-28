@@ -58,11 +58,11 @@ final class CallKitManager: NSObject {
     private static let minReportInterval: TimeInterval = 1.0
 
     private override init() {
-        // The deprecated `init(localizedName:)` is a silent no-op on iOS 14+:
-        // it accepts the string but never stores it, so the daemon registers
-        // `localizedName=(null)` and immediately drops the XPC connection.
-        // The no-arg init derives `localizedName` from CFBundleDisplayName
-        // (pinned to "Untunnel" via INFOPLIST_KEY_CFBundleDisplayName).
+        // iOS 14+: `CXProviderConfiguration.localizedName` est **lecture seule** ; l’init
+        // `init(localizedName:)` est déprécié. Le libellé fournisseur sur l’îlot / l’écran
+        // verrou (ex. « … audio ») est choisi par iOS à partir du **nom d’affichage du bundle**
+        // (`INFOPLIST_KEY_CFBundleDisplayName`), pas via une API CallKit dédiée.
+        // Le suffixe « audio » est ajouté par le système — pas d’API publique pour le retirer.
         let config = CXProviderConfiguration()
         config.supportsVideo = false
         config.supportedHandleTypes = [.generic]            // rule 3

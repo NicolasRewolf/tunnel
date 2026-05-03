@@ -213,7 +213,13 @@ struct SettingsView: View {
         } header: {
             Text("Aide")
         } footer: {
-            Text("Toucher au dos, Bouton Action, Raccourcis : voir l’onboarding.")
+            // Mention Bouton Action only on devices that have one; older
+            // iPhones (mute-switch hardware) get a shorter footer.
+            Text(
+                Device.hasActionButton
+                    ? "Toucher au dos, Bouton Action, Raccourcis : voir l’onboarding."
+                    : "Toucher au dos, Raccourcis : voir l’onboarding."
+            )
         }
     }
 

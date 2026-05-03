@@ -72,26 +72,43 @@ struct OnboardingView: View {
                 "Réglages › Accessibilité › Toucher › Toucher au dos.",
                 "Double toucher ou Triple toucher.",
                 "Raccourci › Déclencher Untunnel.",
-                "Écran verrouillé : passe par Bouton Action, Siri ou le minuteur."
+                primaryFallbackStep,
             ],
             featured: true
         )
     }
 
-    // MARK: - Method 2: Action Button
+    /// Fourth step on the Back Tap card — suggests alternatives that work
+    /// when the phone is locked. Adapts to the user's actual hardware: only
+    /// mentions Bouton Action on devices that ship with one.
+    private var primaryFallbackStep: String {
+        if Device.hasActionButton {
+            return "Écran verrouillé : passe par Bouton Action, Siri ou le minuteur."
+        } else {
+            return "Écran verrouillé : passe par Siri ou le minuteur."
+        }
+    }
 
+    // MARK: - Method 2: Action Button (iPhone 15 Pro+ only)
+
+    /// Hidden on iPhone 14 / 15 / 15 Plus and earlier — those devices have a
+    /// ring/silent switch instead of the Action Button, so this guidance
+    /// would be unactionable.
+    @ViewBuilder
     private var secondaryMethod: some View {
-        MethodCard(
-            icon: "button.horizontal.top.press.fill",
-            label: "Bouton Action",
-            description: "iPhone 15 Pro ou ultérieur. Une pression du bouton latéral.",
-            steps: [
-                "Réglages › Bouton Action.",
-                "Glisse jusqu’à Raccourci.",
-                "Choisis Déclencher Untunnel."
-            ],
-            featured: false
-        )
+        if Device.hasActionButton {
+            MethodCard(
+                icon: "button.horizontal.top.press.fill",
+                label: "Bouton Action",
+                description: "Une pression du bouton latéral.",
+                steps: [
+                    "Réglages › Bouton Action.",
+                    "Glisse jusqu’à Raccourci.",
+                    "Choisis Déclencher Untunnel."
+                ],
+                featured: false
+            )
+        }
     }
 
     // MARK: - Method 3: Home Screen Shortcut
@@ -100,7 +117,7 @@ struct OnboardingView: View {
         MethodCard(
             icon: "square.grid.2x2.fill",
             label: "Icône raccourci",
-            description: "Un bouton Tunnel sur l’écran d’accueil, déguisé en icône neutre.",
+            description: "Un bouton Untunnel sur l’écran d’accueil, déguisé en icône neutre.",
             steps: [
                 "Ouvre l’app Raccourcis.",
                 "Nouveau raccourci › Déclencher Untunnel.",

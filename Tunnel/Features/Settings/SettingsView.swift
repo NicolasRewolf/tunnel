@@ -91,7 +91,7 @@ struct SettingsView: View {
         } header: {
             Label("Aperçu", systemImage: "eye.fill")
         } footer: {
-            Text("Aperçu de l’écran après décrochage. Le nom et la photo apparaissent aussi sur l’appel entrant.")
+            Text("Visible aussi sur l’appel entrant.")
         }
     }
 
@@ -114,7 +114,7 @@ struct SettingsView: View {
         } header: {
             Text("Profil actif")
         } footer: {
-            Text("Le bouton déclenche toujours ce profil.")
+            Text("Le bouton déclenche ce profil.")
         }
     }
 
@@ -174,7 +174,7 @@ struct SettingsView: View {
         } header: {
             Text("Gérer les profils")
         } footer: {
-            Text("Glisser à gauche pour activer, à droite pour dupliquer ou supprimer.")
+            Text("Glisse à droite pour activer, à gauche pour dupliquer ou supprimer.")
         }
     }
 
@@ -190,15 +190,13 @@ struct SettingsView: View {
             RingerVolumeNumberedSteps(steps: RingerVolumeGuide.steps)
 
             Link(destination: RingerVolumeGuide.appleSupportURL) {
-                Label("Aide Apple : volume et sonnerie", systemImage: "safari")
+                Label("Guide Apple : sonnerie", systemImage: "safari")
             }
             .font(.subheadline)
         } header: {
             Label("Son", systemImage: "speaker.wave.2.fill")
         } footer: {
-            Text(
-                "Même sonnerie qu’un appel réel. Untunnel ne peut pas régler ce volume à ta place."
-            )
+            Text("Réglage iOS — l’app n’y a pas accès.")
         }
     }
 
@@ -215,7 +213,7 @@ struct SettingsView: View {
         } header: {
             Text("Aide")
         } footer: {
-            Text("Toucher au dos, Action Button, Raccourcis : le détail est dans l’onboarding.")
+            Text("Toucher au dos, Bouton Action, Raccourcis : voir l’onboarding.")
         }
     }
 

@@ -316,7 +316,7 @@ private struct TimerPickerSheet: View {
                 Text("Déclencher dans…")
                     .font(.title2.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
-                Text("Une notification te préviendra à l’heure dite. Tu peux verrouiller l’iPhone ; touche la notification pour lancer le faux appel.")
+                Text("Une notification te préviendra. Touche-la pour lancer l’appel, même iPhone verrouillé.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

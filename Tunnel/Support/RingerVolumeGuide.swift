@@ -4,14 +4,12 @@ import SwiftUI
 enum RingerVolumeGuide {
     static let title = "Volume de la sonnerie"
     static let lead =
-        "Untunnel utilise la sonnerie système comme un vrai appel. Si c’est trop discret, règle le volume iPhone (sonnerie, pas la musique) :"
+        "Sonnerie système, comme un vrai appel. Si elle est trop discrète :"
 
     static let steps: [String] = [
-        "Ouvre l’app Réglages (icône grise).",
-        "Touche Sons et vibrations.",
-        "Sous Sonnerie et alertes, monte le curseur vers la droite.",
-        "Pendant que le faux appel sonne, les boutons + / – sur le côté règlent souvent la sonnerie.",
-        "Si l’interrupteur au-dessus du volume est orange (mode silencieux), la sonnerie peut être coupée : repasse-le pour entendre le son.",
+        "Réglages › Sons et vibrations.",
+        "Monte le curseur Sonnerie et alertes.",
+        "Interrupteur Sonnerie/Silence (au-dessus du volume) : pas orange.",
     ]
 
     static let appleSupportURL = URL(string: "https://support.apple.com/guide/iphone/iph6113603f2/ios")!

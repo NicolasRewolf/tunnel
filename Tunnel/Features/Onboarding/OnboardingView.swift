@@ -39,7 +39,7 @@ struct OnboardingView: View {
                 .tracking(-0.5)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Associe Tunnel à un geste ou à un bouton pour lancer un faux appel en silence, même main dans la poche.")
+            Text("Associe un geste ou un bouton pour déclencher en silence, main dans la poche.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -67,12 +67,12 @@ struct OnboardingView: View {
         MethodCard(
             icon: "hand.tap.fill",
             label: "Toucher au dos",
-            description: "Tapote 2 ou 3 fois l'arrière de ton iPhone. Le geste le plus invisible (mais pas toujours disponible iPhone verrouillé).",
+            description: "Tapote l’arrière de l’iPhone. Le geste le plus discret.",
             steps: [
-                "Réglages › Accessibilité › Toucher › Toucher au dos",
-                "Double toucher ou Triple toucher",
-                "Raccourci › Déclencher Tunnel",
-                "Si ça ne se lance pas écran verrouillé : utilise plutôt le Bouton Action, Siri, ou le minuteur + notification."
+                "Réglages › Accessibilité › Toucher › Toucher au dos.",
+                "Double toucher ou Triple toucher.",
+                "Raccourci › Déclencher Tunnel.",
+                "Écran verrouillé : passe par Bouton Action, Siri ou le minuteur."
             ],
             featured: true
         )
@@ -84,11 +84,11 @@ struct OnboardingView: View {
         MethodCard(
             icon: "button.horizontal.top.press.fill",
             label: "Bouton Action",
-            description: "Sur iPhone 15 Pro et plus récent. Une seule pression du bouton latéral.",
+            description: "iPhone 15 Pro ou ultérieur. Une pression du bouton latéral.",
             steps: [
-                "Réglages › Bouton Action",
-                "Glisse jusqu'à Raccourci",
-                "Choisis Déclencher Tunnel"
+                "Réglages › Bouton Action.",
+                "Glisse jusqu’à Raccourci.",
+                "Choisis Déclencher Tunnel."
             ],
             featured: false
         )
@@ -100,11 +100,11 @@ struct OnboardingView: View {
         MethodCard(
             icon: "square.grid.2x2.fill",
             label: "Icône raccourci",
-            description: "Place un bouton Tunnel sur ton écran d'accueil, déguisé en icône neutre.",
+            description: "Un bouton Tunnel sur l’écran d’accueil, déguisé en icône neutre.",
             steps: [
-                "Ouvre l'app Raccourcis d'iOS",
-                "Crée un raccourci avec Déclencher Tunnel",
-                "Partager › Ajouter à l'écran d'accueil"
+                "Ouvre l’app Raccourcis.",
+                "Nouveau raccourci › Déclencher Tunnel.",
+                "Partager › Ajouter à l’écran d’accueil."
             ],
             featured: false
         )
@@ -188,7 +188,7 @@ private struct MethodCard: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label). \(description)")
-        .accessibilityHint("\(steps.count) étapes à suivre dans les Réglages")
+        .accessibilityHint("\(steps.count) étapes")
     }
 }
 

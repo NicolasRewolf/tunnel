@@ -73,7 +73,7 @@ struct ProfileEditorView: View {
             } header: {
                 Text("Qui appelle ?")
             } footer: {
-                Text("Nom + légende crédibles, comme sur Téléphone.")
+                Text("Nom et légende, comme dans Téléphone.")
             }
         }
         .navigationTitle(profileTitle)
@@ -106,7 +106,7 @@ struct ProfileEditorView: View {
         } header: {
             Label("Aperçu", systemImage: "eye.fill")
         } footer: {
-            Text("Aperçu de l’écran après décrochage. Le nom et la photo apparaissent aussi sur l’appel entrant.")
+            Text("Visible aussi sur l’appel entrant.")
         }
     }
 

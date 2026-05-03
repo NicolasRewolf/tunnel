@@ -157,12 +157,18 @@ final class AppState {
 
     /// Schedules a fake call `duration` seconds from now. If a timer is
     /// already armed, it is replaced.
+    ///
+    /// Starts a silent-audio keep-alive so the in-process Task fires even
+    /// when the iPhone is locked, screen-down, or has been idle in a pocket.
+    /// The local notification stays scheduled as a fallback (force-quit, audio
+    /// session refused).
     func armTimer(duration: TimeInterval) {
         disarmTimer()
         let deadline = Date.now.addingTimeInterval(duration)
         armedTotalDuration = duration
         armedDeadline = deadline
         Self.persistArmedTimer(deadline: deadline, totalDuration: duration)
+        BackgroundKeepAlive.shared.start()
         recomputeKeepAwake()
         startArmedTimerTask(until: deadline)
         Task {
@@ -179,6 +185,7 @@ final class AppState {
         Self.clearArmedTimerPersistence()
         armedDeadline = nil
         armedTotalDuration = 0
+        BackgroundKeepAlive.shared.stop()
         recomputeKeepAwake()
     }
 
@@ -244,6 +251,7 @@ final class AppState {
 
         armedTotalDuration = total
         armedDeadline = deadline
+        BackgroundKeepAlive.shared.start()
         recomputeKeepAwake()
         startArmedTimerTask(until: deadline)
         Task {
@@ -272,6 +280,8 @@ final class AppState {
         Self.clearArmedTimerPersistence()
         armedDeadline = nil
         armedTotalDuration = 0
+        // Release our audio session before CallKit takes over its own.
+        BackgroundKeepAlive.shared.stop()
         recomputeKeepAwake()
         triggerFakeCallNow()
     }

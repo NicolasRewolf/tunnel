@@ -28,6 +28,10 @@ enum CallKitReportSkipped: LocalizedError {
 ///     the provider and `reportNewIncomingCall` never produces a UI.
 ///     This is a capability gate, not a feature claim: we still ship no
 ///     PushKit, no VoIP push entitlement, and no audio routing.
+///     `UIBackgroundModes` also includes `audio` — used by
+///     `BackgroundKeepAlive` for the armed-timer feature, **not** by CallKit.
+///     We never route the call's audio through `provider(_:didActivate:)`
+///     (rule 6), so the two background modes serve unrelated purposes.
 ///  2. No PushKit, no `com.apple.developer.pushkit.unrestricted-voip`.
 ///     We never receive remote VoIP pushes.
 ///  3. `CXHandle.type = .generic` — never `.phoneNumber`.

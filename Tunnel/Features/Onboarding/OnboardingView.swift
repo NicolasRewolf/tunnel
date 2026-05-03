@@ -71,7 +71,7 @@ struct OnboardingView: View {
             steps: [
                 "Réglages › Accessibilité › Toucher › Toucher au dos.",
                 "Double toucher ou Triple toucher.",
-                "Raccourci › Déclencher Tunnel.",
+                "Raccourci › Déclencher Untunnel.",
                 "Écran verrouillé : passe par Bouton Action, Siri ou le minuteur."
             ],
             featured: true
@@ -88,7 +88,7 @@ struct OnboardingView: View {
             steps: [
                 "Réglages › Bouton Action.",
                 "Glisse jusqu’à Raccourci.",
-                "Choisis Déclencher Tunnel."
+                "Choisis Déclencher Untunnel."
             ],
             featured: false
         )
@@ -103,7 +103,7 @@ struct OnboardingView: View {
             description: "Un bouton Tunnel sur l’écran d’accueil, déguisé en icône neutre.",
             steps: [
                 "Ouvre l’app Raccourcis.",
-                "Nouveau raccourci › Déclencher Tunnel.",
+                "Nouveau raccourci › Déclencher Untunnel.",
                 "Partager › Ajouter à l’écran d’accueil."
             ],
             featured: false

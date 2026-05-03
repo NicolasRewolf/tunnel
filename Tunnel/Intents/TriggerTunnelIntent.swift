@@ -11,7 +11,10 @@ import AppIntents
 /// including on a locked device. Setting this to `true` would flash the HomeView
 /// behind the CallKit card and defeat the purpose of the migration.
 struct TriggerTunnelIntent: AppIntent {
-    static var title: LocalizedStringResource = "Déclencher Tunnel"
+    // Title must match the bundle's display name ("Untunnel"): users who
+    // search Shortcuts for the app name expect to find an action labelled
+    // the same way.
+    static var title: LocalizedStringResource = "Déclencher Untunnel"
     static var description = IntentDescription(
         "Lance immédiatement un faux appel entrant."
     )

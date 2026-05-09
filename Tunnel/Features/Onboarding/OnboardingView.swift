@@ -74,8 +74,22 @@ struct OnboardingView: View {
                 "Raccourci › Déclencher Untunnel.",
                 primaryFallbackStep,
             ],
-            featured: true
+            featured: true,
+            // Filet de sécurité : si l'App Shortcut n'apparaît pas dans la
+            // liste de Toucher au dos (cache Spotlight froid), un tap ouvre
+            // l'app Raccourcis où il est garanti d'apparaître sous Untunnel.
+            // Une fois lancé une fois depuis là, iOS le bridge dans la
+            // bibliothèque et il devient sélectionnable dans Toucher au dos.
+            trailingAction: .init(
+                label: "Pas dans la liste ? Ouvre Raccourcis",
+                handler: openShortcutsApp
+            )
         )
+    }
+
+    private func openShortcutsApp() {
+        guard let url = URL(string: "shortcuts://") else { return }
+        UIApplication.shared.open(url)
     }
 
     /// Fourth step on the Back Tap card — suggests alternatives that work
@@ -148,11 +162,17 @@ struct OnboardingView: View {
 // MARK: - Method card
 
 private struct MethodCard: View {
+    struct TrailingAction {
+        let label: String
+        let handler: () -> Void
+    }
+
     let icon: String
     let label: String
     let description: String
     let steps: [String]
     let featured: Bool
+    var trailingAction: TrailingAction? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -195,6 +215,20 @@ private struct MethodCard: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+            }
+
+            if let trailingAction {
+                Button(action: trailingAction.handler) {
+                    HStack(spacing: 6) {
+                        Text(trailingAction.label)
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
         }
         .padding(18)

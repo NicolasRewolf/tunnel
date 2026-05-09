@@ -18,6 +18,14 @@ struct TunnelApp: App {
         // Calling this is a no-op when the index is already current and is
         // explicitly recommended by the App Intents docs.
         TunnelAppShortcuts.updateAppShortcutParameters()
+
+        // Baseline donation : garantit qu'un utilisateur qui termine
+        // l'onboarding sans jamais déclencher l'appel a quand même un signal
+        // de pertinence pour iOS, ce qui aide à faire apparaître l'action
+        // dans Toucher au dos sans interaction préalable.
+        Task.detached(priority: .utility) {
+            _ = try? await IntentDonationManager.shared.donate(intent: TriggerTunnelIntent())
+        }
     }
 
     var body: some Scene {

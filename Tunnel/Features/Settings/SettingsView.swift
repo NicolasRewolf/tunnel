@@ -207,6 +207,15 @@ struct SettingsView: View {
             navigationRow(icon: "hand.tap.fill", label: "Déclencher sans ouvrir l’app") {
                 appState.openOnboarding()
             }
+            // Direct access to the Shortcuts app — the Untunnel action is
+            // guaranteed to appear there under "Raccourcis d'apps", which
+            // bridges it into Toucher au dos when iOS doesn't surface it
+            // automatically.
+            navigationRow(icon: "arrow.up.right.square", label: "Ouvrir l’app Raccourcis") {
+                if let url = URL(string: "shortcuts://") {
+                    UIApplication.shared.open(url)
+                }
+            }
             navigationRow(icon: "lock.shield.fill", label: "Confidentialité") {
                 showPrivacyPolicy = true
             }
@@ -231,7 +240,7 @@ struct SettingsView: View {
                 Text("Untunnel")
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(.secondary)
-                Text("Simulation locale. Aucune donnée ne quitte cet iPhone.")
+                Text("Simulation locale. Aucune donnée personnelle ne quitte cet iPhone — seul un check de mise à jour quotidien interroge l’App Store.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)

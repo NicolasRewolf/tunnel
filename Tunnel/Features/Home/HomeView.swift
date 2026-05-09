@@ -11,6 +11,8 @@ struct HomeView: View {
     let appState: AppState
     @State private var pulseRing = false
     @State private var showTimerPicker = false
+    @State private var showShortcutAnnouncement = false
+    @State private var pendingUpdate: UpdateChecker.Outcome?
 
     private var isArmed: Bool { appState.armedDeadline != nil }
 
@@ -74,6 +76,46 @@ struct HomeView: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showShortcutAnnouncement, onDismiss: {
+            appState.markShortcutAnnouncementSeen()
+        }) {
+            ShortcutAnnouncementSheet(
+                onOpenShortcuts: {
+                    if let url = URL(string: "shortcuts://") {
+                        UIApplication.shared.open(url)
+                    }
+                    showShortcutAnnouncement = false
+                },
+                onDismiss: { showShortcutAnnouncement = false }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $pendingUpdate) { outcome in
+            UpdateAvailableSheet(
+                latestVersion: outcome.latestVersion,
+                onUpdate: {
+                    UIApplication.shared.open(outcome.appStoreURL)
+                    pendingUpdate = nil
+                },
+                onDismiss: {
+                    UpdateChecker.snooze()
+                    pendingUpdate = nil
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        .task {
+            // Don't double-prompt on the same launch. The shortcut
+            // announcement (one-shot, post-update) takes precedence; the
+            // update checker fires next launch.
+            if appState.shouldOfferShortcutAnnouncement {
+                showShortcutAnnouncement = true
+                return
+            }
+            pendingUpdate = await UpdateChecker.checkForAvailableUpdate()
         }
     }
 
@@ -452,5 +494,133 @@ private struct ErrorToast: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 14))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Erreur. \(message)")
+    }
+}
+
+// MARK: - One-shot upgrade announcement
+
+/// Sheet shown once on first launch after updating from a prior version.
+/// Surfaces the new "Open Shortcuts" fallback to existing users who have
+/// already passed the onboarding and wouldn't otherwise discover it.
+private struct ShortcutAnnouncementSheet: View {
+    let onOpenShortcuts: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer(minLength: 8)
+
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.15))
+                    .frame(width: 64, height: 64)
+                Image(systemName: "hand.tap.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+
+            VStack(spacing: 10) {
+                Text("Toucher au dos, plus fiable")
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                Text("Si « Déclencher Untunnel » n’apparaît pas dans Réglages › Accessibilité › Toucher au dos, ouvre l’app Raccourcis : tu pourras l’ajouter en un tap.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 24)
+
+            Spacer(minLength: 8)
+
+            VStack(spacing: 10) {
+                Button(action: onOpenShortcuts) {
+                    HStack(spacing: 8) {
+                        Text("Ouvrir Raccourcis")
+                        Image(systemName: "arrow.up.right.square")
+                    }
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.extraLarge)
+                .tint(Color.accentColor)
+
+                Button("Plus tard", action: onDismiss)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Update available
+
+/// Shown when `UpdateChecker` detects a newer build on the App Store and
+/// the user hasn't snoozed the prompt in the last 24h. Soft-update only
+/// (dismissible). For a future hard block, gate the dismiss button on a
+/// `minimumSupportedVersion` flag fetched from a remote config.
+private struct UpdateAvailableSheet: View {
+    let latestVersion: String
+    let onUpdate: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer(minLength: 8)
+
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.15))
+                    .frame(width: 64, height: 64)
+                Image(systemName: "arrow.down.app.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+
+            VStack(spacing: 10) {
+                Text("Nouvelle version disponible")
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                Text("Untunnel \(latestVersion) est sur l’App Store. Tu profiteras des dernières améliorations et corrections.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 24)
+
+            Spacer(minLength: 8)
+
+            VStack(spacing: 10) {
+                Button(action: onUpdate) {
+                    HStack(spacing: 8) {
+                        Text("Mettre à jour")
+                        Image(systemName: "arrow.up.right.square")
+                    }
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.extraLarge)
+                .tint(Color.accentColor)
+
+                Button("Plus tard", action: onDismiss)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+        }
+        .padding(.top, 24)
     }
 }

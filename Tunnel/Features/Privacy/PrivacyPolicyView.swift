@@ -11,7 +11,7 @@ struct PrivacyPolicyView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     policyParagraph(
                         title: "Données collectées",
-                        body: "Aucune. Tunnel fonctionne entièrement hors-ligne et ne collecte aucune donnée personnelle."
+                        body: "Aucune. Tunnel ne collecte aucune donnée personnelle. La seule requête réseau de l'app est un check quotidien auprès de l'App Store pour détecter une nouvelle version : seul l'identifiant publique de l'app et ton code pays sont transmis à Apple."
                     )
 
                     policyParagraph(

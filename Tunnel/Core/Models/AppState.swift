@@ -104,10 +104,42 @@ final class AppState {
 
     private var armedTimerTask: Task<Void, Never>?
 
+    /// `true` if this launch started with data persisted by a prior version
+    /// (legacy `app.config` or `app.callProfiles`). Snapshotted at init,
+    /// before migration writes anything, so it remains accurate for the
+    /// lifetime of the process. Used by the one-shot upgrade announcement
+    /// to distinguish "user upgrading" from "first install".
+    let launchedFromPriorVersion: Bool
+
     private init() {
+        let hadPriorData = UserDefaults.standard.data(forKey: StorageKeys.callProfiles) != nil
+            || UserDefaults.standard.data(forKey: StorageKeys.config) != nil
+        launchedFromPriorVersion = hadPriorData
+
         profilesState = Self.loadOrMigrateProfilesState()
         restoreArmedTimerFromStorageIfNeeded()
         restorePendingTriggerErrorFromStorage()
+
+        // Brand-new install: silently mark the upgrade announcement as seen
+        // so we never bother users who never saw the prior onboarding copy.
+        if !hadPriorData {
+            UserDefaults.standard.set(true, forKey: StorageKeys.seenShortcutAnnouncementV1)
+        }
+    }
+
+    // MARK: - One-shot announcement (post-update discoverability)
+
+    /// `true` once on first launch after updating from a prior version, so
+    /// existing users get the same fallback path that new onboarders see in
+    /// the Toucher au dos card. Idempotent: flips to `false` permanently
+    /// once `markShortcutAnnouncementSeen()` is called.
+    var shouldOfferShortcutAnnouncement: Bool {
+        launchedFromPriorVersion
+            && !UserDefaults.standard.bool(forKey: StorageKeys.seenShortcutAnnouncementV1)
+    }
+
+    func markShortcutAnnouncementSeen() {
+        UserDefaults.standard.set(true, forKey: StorageKeys.seenShortcutAnnouncementV1)
     }
 
     // MARK: - Call lifecycle (CallKit-backed)
@@ -440,4 +472,7 @@ private enum StorageKeys {
     static let armedDeadline = "app.armedDeadline"
     static let armedTotalDuration = "app.armedTotalDuration"
     static let pendingIntentTriggerError = "app.pendingIntentTriggerError"
+    /// Bumped to v2/v3/... whenever a new post-update announcement is added.
+    /// Existing keys are kept around so future builds can clear them.
+    static let seenShortcutAnnouncementV1 = "app.seenShortcutAnnouncement.v1"
 }

@@ -87,7 +87,23 @@ final class CallKitManager: NSObject {
     ///
     /// Debounced: two attempts &lt; 1s apart throw `CallKitReportSkipped.debounced`.
     /// If a call is already active (`currentCallUUID`), throws `.callAlreadyActive`.
+    ///
+    /// Auto-retries once after 250ms on transient daemon failures (cold-start
+    /// races, callservicesd hiccups). Deterministic refusals (DND, blocklist,
+    /// debounce, already active) are surfaced immediately without retry.
     func reportIncomingCall(contactName: String) async throws {
+        do {
+            try await reportIncomingCallOnce(contactName: contactName)
+        } catch let error where Self.isTransient(error) {
+            logger.notice(
+                "First attempt failed (transient: \(String(describing: error), privacy: .public)) — retrying once after 250ms"
+            )
+            try await Task.sleep(nanoseconds: 250_000_000)
+            try await reportIncomingCallOnce(contactName: contactName)
+        }
+    }
+
+    private func reportIncomingCallOnce(contactName: String) async throws {
         let now = Date()
         guard now.timeIntervalSince(lastReportAt) >= Self.minReportInterval else {
             logger.info("Debounced rapid-fire incoming call")
@@ -112,6 +128,24 @@ final class CallKitManager: NSObject {
         currentCallUUID = uuid                                              // rule 7: in-memory only
         lastReportAt = Date()
         logger.info("CallKit accepted incoming call \(uuid, privacy: .public)")
+    }
+
+    /// `true` if the error is worth a single retry. Excludes deterministic
+    /// refusals (DND, blocklist, debounce, already-active) — retrying those
+    /// would just hit the same wall.
+    private static func isTransient(_ error: Error) -> Bool {
+        if error is CallKitReportSkipped { return false }
+        let ns = error as NSError
+        if ns.domain == CXErrorDomainIncomingCall,
+           let code = CXErrorCodeIncomingCallError.Code(rawValue: ns.code) {
+            switch code {
+            case .filteredByBlockList, .filteredByDoNotDisturb:
+                return false
+            default:
+                return true
+            }
+        }
+        return true
     }
 
     /// Maps a CallKit error (or any underlying Error) to a short French

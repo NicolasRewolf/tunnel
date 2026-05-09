@@ -4,6 +4,10 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var appState: AppState
     @State private var showPrivacyPolicy = false
+    /// Set when the user taps the toolbar "+" — drives the
+    /// `.navigationDestination(item:)` push so they land directly in the
+    /// editor of the brand-new profile, no scroll-and-tap step.
+    @State private var pendingEditProfileID: UUID?
 
     /// Raccourcis + entrée libre pour le sous-titre (fixe, portable…).
     enum SubtitlePreset: String, CaseIterable, Identifiable {
@@ -80,6 +84,9 @@ struct SettingsView: View {
             .sheet(isPresented: $showPrivacyPolicy) {
                 PrivacyPolicyView()
                     .presentationDragIndicator(.visible)
+            }
+            .navigationDestination(item: $pendingEditProfileID) { profileID in
+                ProfileEditorView(appState: appState, profileID: profileID)
             }
         }
     }
@@ -379,6 +386,10 @@ struct SettingsView: View {
         p.contactSubtitle = "Portable"
         appState.addProfile(p)
         appState.setActiveProfile(id: p.id)
+        // Push the editor immediately so the user lands in the form
+        // they expect after tapping "+", instead of having to scroll
+        // down and tap the new row.
+        pendingEditProfileID = p.id
     }
 }
 

@@ -79,6 +79,7 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showPrivacyPolicy) {
                 PrivacyPolicyView()
+                    .presentationDragIndicator(.visible)
             }
         }
     }

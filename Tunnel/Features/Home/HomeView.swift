@@ -16,6 +16,22 @@ struct HomeView: View {
 
     private var isArmed: Bool { appState.armedDeadline != nil }
 
+    /// Bridges `appState.screen` to a `Bool` binding usable by `.sheet`.
+    /// When the user dismisses the sheet (swipe / Fermer), flips screen
+    /// back to `.home` — but only if we're still on the matching screen,
+    /// to avoid clobbering a concurrent transition (e.g. settings →
+    /// onboarding via the cross-link).
+    private func routedSheetBinding(for screen: AppState.Screen) -> Binding<Bool> {
+        Binding(
+            get: { appState.screen == screen },
+            set: { isPresented in
+                if !isPresented && appState.screen == screen {
+                    appState.screen = .home
+                }
+            }
+        )
+    }
+
     var body: some View {
         ZStack {
             backgroundLayer
@@ -76,6 +92,14 @@ struct HomeView: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: routedSheetBinding(for: .settings)) {
+            SettingsView(appState: appState)
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: routedSheetBinding(for: .onboarding)) {
+            OnboardingView(appState: appState)
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showShortcutAnnouncement, onDismiss: {
             appState.markShortcutAnnouncementSeen()

@@ -15,11 +15,15 @@ struct ContentView: View {
 
     @ViewBuilder
     private var currentScreen: some View {
+        // Onboarding and Settings are presented as swipe-dismissible
+        // sheets from HomeView; the underlying view is always Home so the
+        // user can swipe them down to reveal it. Only `.inCall` is a
+        // genuinely separate full-screen takeover (CallKit-driven).
         switch appState.screen {
-        case .onboarding: OnboardingView(appState: appState)
-        case .home:       HomeView(appState: appState)
-        case .inCall:     InCallView(appState: appState)
-        case .settings:   SettingsView(appState: appState)
+        case .home, .onboarding, .settings:
+            HomeView(appState: appState)
+        case .inCall:
+            InCallView(appState: appState)
         }
     }
 }

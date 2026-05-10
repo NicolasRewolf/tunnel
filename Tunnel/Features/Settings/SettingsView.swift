@@ -59,7 +59,9 @@ struct SettingsView: View {
                 callPreviewSection
                 // 2 — entendre l’appel
                 soundSection
-                // 3 — déclencher, vie privée
+                // 3 — réactivité
+                reactivitySection
+                // 4 — déclencher, vie privée
                 helpSection
                 // 4 — méta
                 aboutSection
@@ -208,7 +210,32 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 3. Aide
+    // MARK: - 3. Réactivité
+
+    /// Toggle the always-on audio keep-alive that lets ad-hoc triggers
+    /// (Bouton Action, Toucher au dos) fire instantly when the iPhone has
+    /// been face-down + locked + idle. Costs battery, so opt-in.
+    private var reactivitySection: some View {
+        Section {
+            Toggle(isOn: $appState.isReactiveModeEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Mode réactif")
+                        .font(.body)
+                    Text(appState.isReactiveModeEnabled
+                        ? "Déclenchement instantané, partout"
+                        : "Déclenchement quand l’iPhone est réveillé")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Réactivité")
+        } footer: {
+            Text("Active : Bouton Action et Raccourcis répondent au quart de tour, même quand l’iPhone est verrouillé face contre la table. Coût : environ 5 à 10 % de batterie en plus par jour (audio silencieux maintenu en arrière-plan).\n\nDésactive : il faut réveiller l’iPhone (le retourner face vers toi, ou tapoter discrètement) avant de déclencher. Aucun coût batterie.")
+        }
+    }
+
+    // MARK: - 4. Aide
 
     private var helpSection: some View {
         Section {
@@ -240,7 +267,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 4. À propos
+    // MARK: - 5. À propos
 
     private var aboutSection: some View {
         Section {

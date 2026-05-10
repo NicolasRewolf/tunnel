@@ -111,10 +111,24 @@ final class AppState {
     /// to distinguish "user upgrading" from "first install".
     let launchedFromPriorVersion: Bool
 
+    /// Reactive mode: keep the audio session active 24/7 so ad-hoc
+    /// triggers (Action Button, Back Tap) fire instantly even when the
+    /// iPhone has been face-down + locked + idle for a long time. Costs
+    /// battery (~5-10%/day). Off by default.
+    var isReactiveModeEnabled: Bool {
+        didSet {
+            guard oldValue != isReactiveModeEnabled else { return }
+            UserDefaults.standard.set(isReactiveModeEnabled, forKey: StorageKeys.reactiveModeEnabled)
+            applyReactiveModeDemand()
+        }
+    }
+
     private init() {
         let hadPriorData = UserDefaults.standard.data(forKey: StorageKeys.callProfiles) != nil
             || UserDefaults.standard.data(forKey: StorageKeys.config) != nil
         launchedFromPriorVersion = hadPriorData
+
+        isReactiveModeEnabled = UserDefaults.standard.bool(forKey: StorageKeys.reactiveModeEnabled)
 
         profilesState = Self.loadOrMigrateProfilesState()
         restoreArmedTimerFromStorageIfNeeded()
@@ -124,6 +138,19 @@ final class AppState {
         // so we never bother users who never saw the prior onboarding copy.
         if !hadPriorData {
             UserDefaults.standard.set(true, forKey: StorageKeys.seenShortcutAnnouncementV1)
+        }
+
+        // Honor the persisted reactive-mode flag from the very first
+        // launch tick: if the user enabled it, the keep-alive must be
+        // running before the app even reaches HomeView.
+        applyReactiveModeDemand()
+    }
+
+    private func applyReactiveModeDemand() {
+        if isReactiveModeEnabled {
+            BackgroundKeepAlive.shared.request(for: .reactiveMode)
+        } else {
+            BackgroundKeepAlive.shared.release(for: .reactiveMode)
         }
     }
 
@@ -200,7 +227,7 @@ final class AppState {
         armedTotalDuration = duration
         armedDeadline = deadline
         Self.persistArmedTimer(deadline: deadline, totalDuration: duration)
-        BackgroundKeepAlive.shared.start()
+        BackgroundKeepAlive.shared.request(for: .armedTimer)
         recomputeKeepAwake()
         startArmedTimerTask(until: deadline)
         Task {
@@ -217,7 +244,7 @@ final class AppState {
         Self.clearArmedTimerPersistence()
         armedDeadline = nil
         armedTotalDuration = 0
-        BackgroundKeepAlive.shared.stop()
+        BackgroundKeepAlive.shared.release(for: .armedTimer)
         recomputeKeepAwake()
     }
 
@@ -283,7 +310,7 @@ final class AppState {
 
         armedTotalDuration = total
         armedDeadline = deadline
-        BackgroundKeepAlive.shared.start()
+        BackgroundKeepAlive.shared.request(for: .armedTimer)
         recomputeKeepAwake()
         startArmedTimerTask(until: deadline)
         Task {
@@ -313,7 +340,7 @@ final class AppState {
         armedDeadline = nil
         armedTotalDuration = 0
         // Release our audio session before CallKit takes over its own.
-        BackgroundKeepAlive.shared.stop()
+        BackgroundKeepAlive.shared.release(for: .armedTimer)
         recomputeKeepAwake()
         triggerFakeCallNow()
     }
@@ -475,4 +502,5 @@ private enum StorageKeys {
     /// Bumped to v2/v3/... whenever a new post-update announcement is added.
     /// Existing keys are kept around so future builds can clear them.
     static let seenShortcutAnnouncementV1 = "app.seenShortcutAnnouncement.v1"
+    static let reactiveModeEnabled = "app.reactiveModeEnabled"
 }

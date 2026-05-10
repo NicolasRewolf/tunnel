@@ -32,6 +32,14 @@ import OSLog
 final class BackgroundKeepAlive {
     static let shared = BackgroundKeepAlive()
 
+    /// Reasons something in the app currently needs the audio keep-alive
+    /// running. Ref-counted so an armed timer disarming doesn't kill a
+    /// concurrent "reactive mode" demand (and vice versa).
+    enum Demand: String {
+        case armedTimer
+        case reactiveMode
+    }
+
     private let logger = Logger(subsystem: "rewolf.Tunnel", category: "BackgroundKeepAlive")
 
     private let engine = AVAudioEngine()
@@ -39,12 +47,29 @@ final class BackgroundKeepAlive {
     private var nodesAttached = false
     private(set) var isRunning = false
 
+    private var activeDemands: Set<Demand> = []
+
     private init() {}
 
-    /// Starts the silent loop. No-op if already running.
-    /// Failure (audio session refused, engine won't start) is logged and
-    /// swallowed: the local-notification fallback still covers the deadline.
-    func start() {
+    /// Register an active need for the audio keep-alive. Idempotent per
+    /// demand: a second `request(for: .armedTimer)` is a no-op.
+    func request(for demand: Demand) {
+        let wasEmpty = activeDemands.isEmpty
+        activeDemands.insert(demand)
+        if wasEmpty { start() }
+    }
+
+    /// Drop a previously-registered need. Stops the audio loop only when
+    /// the last demand is released — otherwise leaves it running.
+    func release(for demand: Demand) {
+        guard activeDemands.contains(demand) else { return }
+        activeDemands.remove(demand)
+        if activeDemands.isEmpty { stop() }
+    }
+
+    /// Internal: actually brings up the audio session + engine. Driven by
+    /// the demand set; never call directly — use `request(for:)`.
+    private func start() {
         guard !isRunning else { return }
 
         let session = AVAudioSession.sharedInstance()
@@ -95,9 +120,9 @@ final class BackgroundKeepAlive {
         logger.info("Silent keep-alive started")
     }
 
-    /// Stops the loop and releases the audio session for other apps.
-    /// Safe to call repeatedly.
-    func stop() {
+    /// Internal: tears down the audio session. Driven by the demand set;
+    /// never call directly — use `release(for:)`.
+    private func stop() {
         guard isRunning else { return }
         player.stop()
         engine.stop()

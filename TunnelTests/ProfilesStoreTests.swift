@@ -51,6 +51,21 @@ final class ProfilesStoreTests: XCTestCase {
         XCTAssertEqual(state.profiles[0].contactName, CallProfile.Defaults.contactName)
     }
 
+    func testProfilesState_duplicateProfile_appendsCopyWithoutChangingActive() {
+        var original = CallProfile()
+        original.contactName = "Original"
+        var state = ProfilesState(profiles: [original], activeProfileID: original.id)
+
+        let copyID = state.duplicateProfile(id: original.id)
+
+        XCTAssertEqual(state.profiles.count, 2)
+        XCTAssertEqual(copyID, state.profiles[1].id)
+        XCTAssertNotEqual(copyID, original.id)
+        XCTAssertEqual(state.activeProfileID, original.id)
+        XCTAssertEqual(state.profiles[1].contactName, "Original")
+        XCTAssertNil(state.duplicateProfile(id: UUID()))
+    }
+
     func testProfilesState_deleteActiveProfile_repointsActiveID() {
         var p1 = CallProfile()
         p1.contactName = "Un"

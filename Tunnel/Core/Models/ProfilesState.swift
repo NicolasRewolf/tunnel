@@ -41,6 +41,17 @@ struct ProfilesState: Codable, Equatable {
         }
     }
 
+    /// Appends a copy with a new `id`. Does not change the active profile.
+    /// Returns the new profile's id, or `nil` if the source id was not found.
+    @discardableResult
+    mutating func duplicateProfile(id: UUID) -> UUID? {
+        guard let existing = profiles.first(where: { $0.id == id }) else { return nil }
+        var copy = existing
+        copy.id = UUID()
+        profiles.append(copy)
+        return copy.id
+    }
+
     mutating func deleteProfile(id: UUID) {
         guard let idx = profiles.firstIndex(where: { $0.id == id }) else { return }
         profiles.remove(at: idx)

@@ -58,10 +58,7 @@ final class AppState {
     }
 
     func duplicateProfile(id: UUID) {
-        guard let existing = profilesState.profiles.first(where: { $0.id == id }) else { return }
-        var copy = existing
-        copy.id = UUID()
-        updateProfiles { $0.profiles.append(copy) }
+        updateProfiles { $0.duplicateProfile(id: id) }
     }
 
     func deleteProfile(id: UUID) {

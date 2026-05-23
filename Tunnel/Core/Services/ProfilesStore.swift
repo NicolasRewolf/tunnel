@@ -18,10 +18,16 @@ struct ProfilesStore {
     }
 
     func loadOrMigrate() -> ProfilesState {
-        if let data = defaults.data(forKey: StorageKey.callProfiles),
-           let state = try? JSONDecoder().decode(ProfilesState.self, from: data),
-           !state.profiles.isEmpty {
-            return repairActiveIDIfNeeded(state)
+        if let data = defaults.data(forKey: StorageKey.callProfiles) {
+            do {
+                let state = try JSONDecoder().decode(ProfilesState.self, from: data)
+                if !state.profiles.isEmpty {
+                    return repairActiveIDIfNeeded(state)
+                }
+                logger.warning("Stored ProfilesState was empty — re-seeding defaults")
+            } catch {
+                logger.error("Failed to decode ProfilesState: \(error.localizedDescription, privacy: .public)")
+            }
         }
 
         if let legacy = loadLegacyConfig() {
@@ -40,8 +46,12 @@ struct ProfilesStore {
     }
 
     func save(_ state: ProfilesState) {
-        guard let data = try? JSONEncoder().encode(state) else { return }
-        defaults.set(data, forKey: StorageKey.callProfiles)
+        do {
+            let data = try JSONEncoder().encode(state)
+            defaults.set(data, forKey: StorageKey.callProfiles)
+        } catch {
+            logger.error("Failed to encode ProfilesState: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// `true` when prior-version data existed before this launch's migration write.

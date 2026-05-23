@@ -7,6 +7,7 @@ struct ProfileEditorView: View {
     @Bindable var appState: AppState
     let profileID: UUID
 
+    @Environment(\.dismiss) private var dismiss
     @State private var photoSelection: PhotosPickerItem?
     @State private var subtitlePreset: ContactSubtitlePreset = .portable
 
@@ -14,6 +15,22 @@ struct ProfileEditorView: View {
     private static let avatarMaxDimension: CGFloat = 600
 
     var body: some View {
+        Group {
+            if appState.profilesState.profiles.contains(where: { $0.id == profileID }) {
+                editorForm
+            } else {
+                ContentUnavailableView(
+                    "Profil introuvable",
+                    systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("Ce profil a peut-être été supprimé.")
+                )
+                .onAppear { dismiss() }
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var editorForm: some View {
         Form {
             Section {
                 CallProfilePreviewCard(profile: profileBinding.wrappedValue)
@@ -86,7 +103,6 @@ struct ProfileEditorView: View {
             }
         }
         .navigationTitle(profileTitle)
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             subtitlePreset = ContactSubtitlePreset.matching(profileBinding.wrappedValue.contactSubtitle)
         }
@@ -109,10 +125,11 @@ struct ProfileEditorView: View {
         }
     }
 
+    /// Only used when `profileID` exists in `profilesState` (see `editorForm`).
     private var profileBinding: Binding<CallProfile> {
         Binding(
             get: {
-                appState.profilesState.profiles.first(where: { $0.id == profileID }) ?? CallProfile()
+                appState.profilesState.profiles.first(where: { $0.id == profileID })!
             },
             set: { updated in
                 appState.upsertProfile(updated)

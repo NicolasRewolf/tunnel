@@ -12,15 +12,15 @@ App iOS qui déclenche un **faux appel entrant** (CallKit) pour sortir d’une c
 - **iOS déploiement** : 26.0 (voir `project.pbxproj`).
 - **CallKit** : uniquement dans `Tunnel/Core/Services/CallKitManager.swift` (`import CallKit` nulle part ailleurs).
 - **App Intents** : `TriggerTunnelIntent` + `TunnelAppShortcuts` (Raccourcis, Back Tap, Action Button).
-- **Persistance** : `FakeCallConfig` (Codable) dans `UserDefaults`.
+- **Persistance** : `ProfilesState` + `CallProfile` (Codable) dans `UserDefaults` (`app.callProfiles`). Migration depuis l’ancien `FakeCallConfig` (`app.config`, legacy).
 
 ## Structure du module `Tunnel/`
 
 | Dossier | Rôle |
 |---------|------|
 | `App/` | Point d’entrée : `@main`, `AppDelegate`, routage `ContentView` |
-| `Core/Models/` | `AppState`, `FakeCallConfig` |
-| `Core/Services/` | `CallKitManager`, `ArmedTimerNotificationScheduler` (effets de bord isolés) |
+| `Core/Models/` | `AppState`, `CallProfile`, `ProfilesState`, `FakeCallConfig` (legacy) |
+| `Core/Services/` | `CallKitManager`, `ProfilesStore`, `ArmedTimerPersistence`, `ArmedTimerNotificationScheduler`, `BackgroundKeepAlive` |
 | `Intents/` | App Intents (raccourcis système) |
 | `Features/*/` | Écrans par domaine (Home, Onboarding, InCall, Settings, Privacy) |
 | `Support/` | Guides partagés (`RingerVolumeGuide`), `Extensions/` |
@@ -54,11 +54,13 @@ App iOS qui déclenche un **faux appel entrant** (CallKit) pour sortir d’une c
 |--------|------|
 | `Tunnel/App/TunnelApp.swift` | Warm-up `CallKitManager.shared` au lancement |
 | `Tunnel/App/ContentView.swift` | Route `home` / `onboarding` / `inCall` / `settings` |
-| `Tunnel/Core/Models/AppState.swift` | Écran, config, timer armé, callbacks CallKit |
+| `Tunnel/Core/Models/AppState.swift` | Écran, profils actifs, timer armé, mode réactif, callbacks CallKit |
+| `Tunnel/Core/Services/ProfilesStore.swift` | Chargement, migration, seed des profils |
 | `Tunnel/Core/Services/CallKitManager.swift` | Tout CallKit |
 | `Tunnel/Intents/TriggerTunnelIntent.swift` | Action système |
 | `Tunnel/Features/InCall/InCallView.swift` | Après décrochage |
 | `TunnelTests/CallKitErrorMappingTests.swift` | Non-régression des messages d’erreur (mapping sans CallKit live) |
+| `TunnelTests/ProfilesStoreTests.swift` | Migration legacy, seed, suppression / active ID |
 
 ## Règles de travail (code)
 

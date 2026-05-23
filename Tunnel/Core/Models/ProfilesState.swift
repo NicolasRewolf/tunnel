@@ -40,5 +40,31 @@ struct ProfilesState: Codable, Equatable {
             activeProfileID = profiles[0].id
         }
     }
+
+    mutating func deleteProfile(id: UUID) {
+        guard let idx = profiles.firstIndex(where: { $0.id == id }) else { return }
+        profiles.remove(at: idx)
+        if profiles.isEmpty {
+            let fallback = CallProfile()
+            profiles = [fallback]
+            activeProfileID = fallback.id
+        } else if !profiles.contains(where: { $0.id == activeProfileID }) {
+            activeProfileID = profiles[0].id
+        }
+    }
+
+    mutating func deleteProfiles(at offsets: IndexSet) {
+        for index in offsets.sorted(by: >) {
+            guard profiles.indices.contains(index) else { continue }
+            profiles.remove(at: index)
+        }
+        if profiles.isEmpty {
+            let fallback = CallProfile()
+            profiles = [fallback]
+            activeProfileID = fallback.id
+        } else if !profiles.contains(where: { $0.id == activeProfileID }) {
+            activeProfileID = profiles[0].id
+        }
+    }
 }
 

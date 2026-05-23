@@ -1,7 +1,6 @@
 import Foundation
 import Observation
 import OSLog
-import SwiftUI
 import UIKit
 
 @MainActor
@@ -17,69 +16,60 @@ final class AppState {
     static let shared = AppState()
 
     private let logger = Logger(subsystem: "rewolf.Tunnel", category: "AppState")
+    private let profilesStore = ProfilesStore()
 
     var screen: Screen = .home {
         didSet { recomputeKeepAwake() }
     }
 
     var profilesState: ProfilesState {
-        didSet { persistProfilesState() }
+        didSet { profilesStore.save(profilesState) }
     }
 
     /// Convenience access for view layers that only care about the active profile.
     /// Setting writes back into `profilesState` (and persists).
     var activeProfile: CallProfile {
         get {
-            profilesState.activeProfile ?? profilesState.profiles.first ?? CallProfile()
+            if let profile = profilesState.activeProfile {
+                return profile
+            }
+            if let first = profilesState.profiles.first {
+                logger.warning("activeProfileID invalid — using first profile")
+                return first
+            }
+            return CallProfile()
         }
         set {
-            var next = profilesState
-            next.upsertProfile(newValue)
-            next.setActiveProfile(id: newValue.id)
-            profilesState = next
+            updateProfiles { state in
+                state.upsertProfile(newValue)
+                state.setActiveProfile(id: newValue.id)
+            }
         }
     }
 
     // MARK: - Profiles API (UI helpers)
 
     func setActiveProfile(id: UUID) {
-        var next = profilesState
-        next.setActiveProfile(id: id)
-        profilesState = next
+        updateProfiles { $0.setActiveProfile(id: id) }
     }
 
-    func addProfile(_ profile: CallProfile) {
-        var next = profilesState
-        next.upsertProfile(profile)
-        profilesState = next
+    func upsertProfile(_ profile: CallProfile) {
+        updateProfiles { $0.upsertProfile(profile) }
     }
 
     func duplicateProfile(id: UUID) {
         guard let existing = profilesState.profiles.first(where: { $0.id == id }) else { return }
         var copy = existing
         copy.id = UUID()
-        var next = profilesState
-        next.profiles.append(copy)
-        profilesState = next
-    }
-
-    func deleteProfiles(at offsets: IndexSet) {
-        var next = profilesState
-        next.profiles.remove(atOffsets: offsets)
-
-        if next.profiles.isEmpty {
-            let fallback = CallProfile()
-            next = ProfilesState(single: fallback)
-        } else if !next.profiles.contains(where: { $0.id == next.activeProfileID }) {
-            next.activeProfileID = next.profiles[0].id
-        }
-
-        profilesState = next
+        updateProfiles { $0.profiles.append(copy) }
     }
 
     func deleteProfile(id: UUID) {
-        guard let idx = profilesState.profiles.firstIndex(where: { $0.id == id }) else { return }
-        deleteProfiles(at: IndexSet(integer: idx))
+        updateProfiles { $0.deleteProfile(id: id) }
+    }
+
+    func deleteProfiles(at offsets: IndexSet) {
+        updateProfiles { $0.deleteProfiles(at: offsets) }
     }
 
     /// Last user-facing error from a trigger attempt (e.g. CallKit refused the
@@ -124,19 +114,17 @@ final class AppState {
     }
 
     private init() {
-        let hadPriorData = UserDefaults.standard.data(forKey: StorageKeys.callProfiles) != nil
-            || UserDefaults.standard.data(forKey: StorageKeys.config) != nil
-        launchedFromPriorVersion = hadPriorData
+        launchedFromPriorVersion = profilesStore.hadPriorVersionData()
 
         isReactiveModeEnabled = UserDefaults.standard.bool(forKey: StorageKeys.reactiveModeEnabled)
 
-        profilesState = Self.loadOrMigrateProfilesState()
+        profilesState = profilesStore.loadOrMigrate()
         restoreArmedTimerFromStorageIfNeeded()
         restorePendingTriggerErrorFromStorage()
 
         // Brand-new install: silently mark the upgrade announcement as seen
         // so we never bother users who never saw the prior onboarding copy.
-        if !hadPriorData {
+        if !launchedFromPriorVersion {
             UserDefaults.standard.set(true, forKey: StorageKeys.seenShortcutAnnouncementV1)
         }
 
@@ -176,12 +164,10 @@ final class AppState {
     /// UI is consistent with the Back Tap / Action Button / Shortcut paths.
     func triggerFakeCallNow() {
         acknowledgeTriggerError()
-        Task { [logger, weak self] in
+        let contactName = activeProfile.contactName
+        Task { [logger, weak self, contactName] in
             do {
-                let contactName = await MainActor.run { AppState.shared.activeProfile.contactName }
-                try await CallKitManager.shared.reportIncomingCall(
-                    contactName: contactName
-                )
+                try await CallKitManager.shared.reportIncomingCall(contactName: contactName)
             } catch {
                 logger.error(
                     "triggerFakeCallNow failed: \(error.localizedDescription, privacy: .public) (\(String(describing: error), privacy: .public))"
@@ -226,7 +212,7 @@ final class AppState {
         let deadline = Date.now.addingTimeInterval(duration)
         armedTotalDuration = duration
         armedDeadline = deadline
-        Self.persistArmedTimer(deadline: deadline, totalDuration: duration)
+        ArmedTimerPersistence.persist(deadline: deadline, totalDuration: duration)
         BackgroundKeepAlive.shared.request(for: .armedTimer)
         recomputeKeepAwake()
         startArmedTimerTask(until: deadline)
@@ -241,7 +227,7 @@ final class AppState {
         armedTimerTask?.cancel()
         armedTimerTask = nil
         ArmedTimerNotificationScheduler.cancel()
-        Self.clearArmedTimerPersistence()
+        ArmedTimerPersistence.clear()
         armedDeadline = nil
         armedTotalDuration = 0
         BackgroundKeepAlive.shared.release(for: .armedTimer)
@@ -292,30 +278,16 @@ final class AppState {
     // MARK: - Armed timer internals
 
     private func restoreArmedTimerFromStorageIfNeeded() {
-        guard let ts = UserDefaults.standard.object(forKey: StorageKeys.armedDeadline) as? TimeInterval else {
-            return
-        }
-        let deadline = Date(timeIntervalSince1970: ts)
-        guard deadline > Date.now else {
-            Self.clearArmedTimerPersistence()
-            ArmedTimerNotificationScheduler.cancel()
-            return
-        }
+        guard let snapshot = ArmedTimerPersistence.load() else { return }
 
-        var total = UserDefaults.standard.double(forKey: StorageKeys.armedTotalDuration)
-        if total <= 0 {
-            total = max(deadline.timeIntervalSinceNow, 60)
-            Self.persistArmedTimer(deadline: deadline, totalDuration: total)
-        }
-
-        armedTotalDuration = total
-        armedDeadline = deadline
+        armedTotalDuration = snapshot.totalDuration
+        armedDeadline = snapshot.deadline
         BackgroundKeepAlive.shared.request(for: .armedTimer)
         recomputeKeepAwake()
-        startArmedTimerTask(until: deadline)
+        startArmedTimerTask(until: snapshot.deadline)
         Task {
             await ArmedTimerNotificationScheduler.requestAuthorizationIfNeeded()
-            await ArmedTimerNotificationScheduler.schedule(at: deadline)
+            await ArmedTimerNotificationScheduler.schedule(at: snapshot.deadline)
         }
     }
 
@@ -336,7 +308,7 @@ final class AppState {
     private func finishArmedTimerFromSleep() {
         armedTimerTask = nil
         ArmedTimerNotificationScheduler.cancel()
-        Self.clearArmedTimerPersistence()
+        ArmedTimerPersistence.clear()
         armedDeadline = nil
         armedTotalDuration = 0
         // Release our audio session before CallKit takes over its own.
@@ -347,160 +319,25 @@ final class AppState {
 
     // MARK: - Private
 
+    private func updateProfiles(_ transform: (inout ProfilesState) -> Void) {
+        var next = profilesState
+        transform(&next)
+        profilesState = next
+    }
+
     /// Single source of truth for `isIdleTimerDisabled`. Called whenever any
     /// input into that decision (screen, armed timer) changes. Idempotent.
     private func recomputeKeepAwake() {
         let shouldKeep = armedDeadline != nil || screen == .inCall
         UIApplication.shared.isIdleTimerDisabled = shouldKeep
     }
-
-    // MARK: - Persistence
-
-    private func persistProfilesState() {
-        guard let data = try? JSONEncoder().encode(profilesState) else { return }
-        UserDefaults.standard.set(data, forKey: StorageKeys.callProfiles)
-    }
-
-    private static func loadLegacyConfig() -> FakeCallConfig? {
-        guard
-            let data = UserDefaults.standard.data(forKey: StorageKeys.config),
-            let config = try? JSONDecoder().decode(FakeCallConfig.self, from: data)
-        else {
-            return nil
-        }
-        return config
-    }
-
-    private static func loadOrMigrateProfilesState() -> ProfilesState {
-        if let data = UserDefaults.standard.data(forKey: StorageKeys.callProfiles),
-           let state = try? JSONDecoder().decode(ProfilesState.self, from: data),
-           !state.profiles.isEmpty {
-            return state
-        }
-
-        if let legacy = loadLegacyConfig() {
-            // Migration: older versions stored a single `FakeCallConfig` at `app.config`.
-            var initial = CallProfile()
-            initial.contactName = legacy.contactName
-            initial.contactSubtitle = legacy.contactSubtitle
-            initial.contactImageData = legacy.contactImageData
-
-            let migrated = ProfilesState(single: initial)
-            if let data = try? JSONEncoder().encode(migrated) {
-                UserDefaults.standard.set(data, forKey: StorageKeys.callProfiles)
-            }
-            return migrated
-        }
-
-        // Fresh install: bootstrap a few starter profiles.
-        let starters: [CallProfile] = [
-            seededProfile(
-                name: "Crèche",
-                subtitle: "Portable",
-                symbol: "building.2.fill",
-                colors: (UIColor.systemTeal, UIColor.systemBlue)
-            ),
-            seededProfile(
-                name: "Ehpad",
-                subtitle: "Portable",
-                symbol: "cross.case.fill",
-                colors: (UIColor.systemPink, UIColor.systemRed)
-            ),
-            seededProfile(
-                name: "Astreinte",
-                subtitle: "Portable",
-                symbol: "person.badge.clock.fill",
-                colors: (UIColor.systemIndigo, UIColor.systemPurple)
-            ),
-        ]
-
-        let seeded = ProfilesState(profiles: starters, activeProfileID: starters[0].id)
-        if let data = try? JSONEncoder().encode(seeded) {
-            UserDefaults.standard.set(data, forKey: StorageKeys.callProfiles)
-        }
-        return seeded
-    }
-
-    private static func seededProfile(
-        name: String,
-        subtitle: String,
-        symbol: String,
-        colors: (UIColor, UIColor)
-    ) -> CallProfile {
-        var p = CallProfile()
-        p.contactName = name
-        p.contactSubtitle = subtitle
-        p.contactImageData = seededAvatarJPEGData(symbol: symbol, colors: colors)
-        return p
-    }
-
-    private static func seededAvatarJPEGData(
-        symbol: String,
-        colors: (UIColor, UIColor)
-    ) -> Data? {
-        let size = CGSize(width: 600, height: 600)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let image = renderer.image { ctx in
-            // Background gradient
-            let cgColors = [colors.0.cgColor, colors.1.cgColor] as CFArray
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
-            if let gradient = CGGradient(colorsSpace: colorSpace, colors: cgColors, locations: [0, 1]) {
-                ctx.cgContext.drawLinearGradient(
-                    gradient,
-                    start: CGPoint(x: 0, y: 0),
-                    end: CGPoint(x: size.width, y: size.height),
-                    options: []
-                )
-            } else {
-                colors.0.setFill()
-                ctx.fill(CGRect(origin: .zero, size: size))
-            }
-
-            // Subtle vignette
-            UIColor.black.withAlphaComponent(0.12).setFill()
-            ctx.cgContext.fillEllipse(in: CGRect(x: -120, y: -80, width: 520, height: 520))
-            UIColor.black.withAlphaComponent(0.18).setFill()
-            ctx.cgContext.fillEllipse(in: CGRect(x: 220, y: 260, width: 560, height: 560))
-
-            // Symbol
-            let pointSize: CGFloat = 250
-            let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
-            let symbolImage = UIImage(systemName: symbol, withConfiguration: config)
-            let tint = UIColor.white.withAlphaComponent(0.95)
-            let rendered = symbolImage?.withTintColor(tint, renderingMode: .alwaysOriginal)
-
-            if let rendered {
-                let rect = CGRect(
-                    x: (size.width - pointSize) / 2,
-                    y: (size.height - pointSize) / 2,
-                    width: pointSize,
-                    height: pointSize
-                )
-                rendered.draw(in: rect)
-            }
-        }
-        return image.jpegData(compressionQuality: 0.90)
-    }
-
-    private static func persistArmedTimer(deadline: Date, totalDuration: TimeInterval) {
-        UserDefaults.standard.set(deadline.timeIntervalSince1970, forKey: StorageKeys.armedDeadline)
-        UserDefaults.standard.set(totalDuration, forKey: StorageKeys.armedTotalDuration)
-    }
-
-    private static func clearArmedTimerPersistence() {
-        UserDefaults.standard.removeObject(forKey: StorageKeys.armedDeadline)
-        UserDefaults.standard.removeObject(forKey: StorageKeys.armedTotalDuration)
-    }
 }
 
 private enum StorageKeys {
-    static let config = "app.config"
-    static let callProfiles = "app.callProfiles"
     static let armedDeadline = "app.armedDeadline"
     static let armedTotalDuration = "app.armedTotalDuration"
     static let pendingIntentTriggerError = "app.pendingIntentTriggerError"
     /// Bumped to v2/v3/... whenever a new post-update announcement is added.
-    /// Existing keys are kept around so future builds can clear them.
     static let seenShortcutAnnouncementV1 = "app.seenShortcutAnnouncement.v1"
     static let reactiveModeEnabled = "app.reactiveModeEnabled"
 }

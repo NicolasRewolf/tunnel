@@ -1,69 +1,21 @@
 import SwiftUI
 
-/// Réglages : ordre par importance — faux appel (aperçu, identité, photo), son, aide, à propos.
+/// Réglages : profils, aperçu, son, réactivité, aide.
 struct SettingsView: View {
     @Bindable var appState: AppState
     @State private var showPrivacyPolicy = false
     /// Set when the user taps the toolbar "+" — drives the
-    /// `.navigationDestination(item:)` push so they land directly in the
-    /// editor of the brand-new profile, no scroll-and-tap step.
+    /// `.navigationDestination(item:)` push so they land directly in the editor.
     @State private var pendingEditProfileID: UUID?
-
-    /// Raccourcis + entrée libre pour le sous-titre (fixe, portable…).
-    enum SubtitlePreset: String, CaseIterable, Identifiable {
-        case portable
-        case fixe
-        case bureau
-        case domicile
-        case personnalise
-
-        var id: String { rawValue }
-
-        var label: String {
-            switch self {
-            case .portable: return "Portable"
-            case .fixe: return "Fixe"
-            case .bureau: return "Bureau"
-            case .domicile: return "Domicile"
-            case .personnalise: return "Autre…"
-            }
-        }
-
-        /// Valeur enregistrée dans `FakeCallConfig.contactSubtitle`.
-        var storedValue: String {
-            switch self {
-            case .portable: return "Portable"
-            case .fixe: return "Fixe"
-            case .bureau: return "Bureau"
-            case .domicile: return "Domicile"
-            case .personnalise: return ""
-            }
-        }
-
-        static func matching(_ string: String) -> SubtitlePreset {
-            let t = string.trimmingCharacters(in: .whitespacesAndNewlines)
-            for p in SubtitlePreset.allCases where p != .personnalise {
-                if p.storedValue.caseInsensitiveCompare(t) == .orderedSame { return p }
-            }
-            return .personnalise
-        }
-    }
-
-    private static let previewAvatarSize: CGFloat = 52
 
     var body: some View {
         NavigationStack {
             Form {
-                activeProfileSection
                 manageProfilesSection
                 callPreviewSection
-                // 2 — entendre l’appel
                 soundSection
-                // 3 — réactivité
                 reactivitySection
-                // 4 — déclencher, vie privée
                 helpSection
-                // 4 — méta
                 aboutSection
             }
             .navigationTitle("Réglages")
@@ -93,77 +45,51 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 1. Aperçu
-
-    private var callPreviewSection: some View {
-        Section {
-            callPreviewCard
-        } header: {
-            Label("Aperçu", systemImage: "eye.fill")
-        } footer: {
-            Text("Visible aussi sur l’appel entrant.")
-        }
-    }
-
-    // MARK: - 0. Profil actif + gestion
-
-    private var activeProfileID: Binding<UUID> {
-        Binding(
-            get: { appState.profilesState.activeProfileID },
-            set: { newValue in appState.setActiveProfile(id: newValue) }
-        )
-    }
-
-    private var activeProfileSection: some View {
-        Section {
-            Picker("Profil actif", selection: activeProfileID) {
-                ForEach(appState.profilesState.profiles) { profile in
-                    Text(profileDisplayName(profile)).tag(profile.id)
-                }
-            }
-        } header: {
-            Text("Profil actif")
-        } footer: {
-            Text("Le bouton déclenche ce profil.")
-        }
-    }
+    // MARK: - Profils
 
     private var manageProfilesSection: some View {
         Section {
             ForEach(appState.profilesState.profiles) { profile in
-                NavigationLink {
-                    ProfileEditorView(appState: appState, profileID: profile.id)
-                } label: {
-                    HStack(spacing: 12) {
-                        profileAvatar(profile)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(profileDisplayName(profile))
-                                .font(.body.weight(.medium))
-                                .lineLimit(1)
-                            let subtitle = profile.contactSubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !subtitle.isEmpty {
-                                Text(subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                        if profile.id == appState.profilesState.activeProfileID {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                                .accessibilityHidden(true)
-                        }
-                    }
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                HStack(spacing: 12) {
                     Button {
                         appState.setActiveProfile(id: profile.id)
                     } label: {
-                        Label("Activer", systemImage: "checkmark")
+                        Image(systemName: profile.id == appState.profilesState.activeProfileID
+                            ? "checkmark.circle.fill"
+                            : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(profile.id == appState.profilesState.activeProfileID
+                            ? Color.accentColor
+                            : Color.secondary.opacity(0.5))
                     }
-                    .tint(Color.accentColor)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        profile.id == appState.profilesState.activeProfileID
+                            ? "Profil actif"
+                            : "Activer ce profil"
+                    )
+
+                    NavigationLink {
+                        ProfileEditorView(appState: appState, profileID: profile.id)
+                    } label: {
+                        HStack(spacing: 12) {
+                            ProfileAvatarView(imageData: profile.contactImageData, size: 34)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(profileDisplayName(profile))
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                let subtitle = profile.contactSubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !subtitle.isEmpty {
+                                    Text(subtitle)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button {
@@ -182,14 +108,23 @@ struct SettingsView: View {
             }
             .onDelete(perform: appState.deleteProfiles)
         } header: {
-            Text("Gérer les profils")
+            Text("Profils")
         } footer: {
-            Text("Glisse à droite pour activer, à gauche pour dupliquer ou supprimer.")
+            Text("Touche la coche pour le profil déclenché par le bouton d’accueil. Touche le nom pour modifier.")
         }
     }
 
+    private var callPreviewSection: some View {
+        Section {
+            CallProfilePreviewCard(profile: appState.activeProfile)
+        } header: {
+            Label("Aperçu", systemImage: "eye.fill")
+        } footer: {
+            Text("Visible aussi sur l’appel entrant.")
+        }
+    }
 
-    // MARK: - 2. Son
+    // MARK: - Son
 
     private var soundSection: some View {
         Section {
@@ -210,11 +145,8 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 3. Réactivité
+    // MARK: - Réactivité
 
-    /// Toggle the always-on audio keep-alive that lets ad-hoc triggers
-    /// (Bouton Action, Toucher au dos) fire instantly when the iPhone has
-    /// been face-down + locked + idle. Costs battery, so opt-in.
     private var reactivitySection: some View {
         Section {
             Toggle(isOn: $appState.isReactiveModeEnabled) {
@@ -235,17 +167,13 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 4. Aide
+    // MARK: - Aide
 
     private var helpSection: some View {
         Section {
             navigationRow(icon: "hand.tap.fill", label: "Déclencher sans ouvrir l’app") {
                 appState.openOnboarding()
             }
-            // Direct access to the Shortcuts app — the Untunnel action is
-            // guaranteed to appear there under "Raccourcis d'apps", which
-            // bridges it into Toucher au dos when iOS doesn't surface it
-            // automatically.
             navigationRow(icon: "arrow.up.right.square", label: "Ouvrir l’app Raccourcis") {
                 if let url = URL(string: "shortcuts://") {
                     UIApplication.shared.open(url)
@@ -257,8 +185,6 @@ struct SettingsView: View {
         } header: {
             Text("Aide")
         } footer: {
-            // Mention Bouton Action only on devices that have one; older
-            // iPhones (mute-switch hardware) get a shorter footer.
             Text(
                 Device.hasActionButton
                     ? "Toucher au dos, Bouton Action, Raccourcis : voir l’onboarding."
@@ -267,7 +193,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 5. À propos
+    // MARK: - À propos
 
     private var aboutSection: some View {
         Section {
@@ -312,111 +238,18 @@ struct SettingsView: View {
         .accessibilityHint("Ouvre \(label)")
     }
 
-    // MARK: - Preview card
-
-    private var callPreviewCard: some View {
-        let name = appState.activeProfile.contactName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let caption = appState.activeProfile.contactSubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        return HStack(alignment: .center, spacing: 14) {
-            Group {
-                if let data = appState.activeProfile.contactImageData,
-                   let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    ZStack {
-                        Circle().fill(Color.white.opacity(0.12))
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 22))
-                            .foregroundStyle(.white.opacity(0.75))
-                    }
-                }
-            }
-            .frame(width: Self.previewAvatarSize, height: Self.previewAvatarSize)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(name.isEmpty ? "Nom du contact" : name)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Text(caption.isEmpty ? "Légende (fixe, portable…)" : caption)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.68))
-                    .lineLimit(1)
-
-                Text("00:00")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.82))
-                    .monospacedDigit()
-                    .padding(.top, 2)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.14, green: 0.14, blue: 0.16),
-                            Color(red: 0.08, green: 0.08, blue: 0.09),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-        }
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-        .listRowBackground(Color.clear)
-    }
-
-    @ViewBuilder
-    private func profileAvatar(_ profile: CallProfile) -> some View {
-        let size: CGFloat = 34
-        Group {
-            if let data = profile.contactImageData,
-               let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                ZStack {
-                    Color(.tertiarySystemFill)
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
-    }
-
     private func profileDisplayName(_ profile: CallProfile) -> String {
         let t = profile.contactName.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? "Profil" : t
     }
 
     private func addProfile() {
-        var p = CallProfile()
-        p.contactName = "Nouveau profil"
-        p.contactSubtitle = "Portable"
-        appState.addProfile(p)
-        appState.setActiveProfile(id: p.id)
-        // Push the editor immediately so the user lands in the form
-        // they expect after tapping "+", instead of having to scroll
-        // down and tap the new row.
-        pendingEditProfileID = p.id
+        var profile = CallProfile()
+        profile.contactName = "Nouveau profil"
+        profile.contactSubtitle = "Portable"
+        appState.upsertProfile(profile)
+        appState.setActiveProfile(id: profile.id)
+        pendingEditProfileID = profile.id
     }
 }
 

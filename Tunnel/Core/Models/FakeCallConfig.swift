@@ -1,7 +1,8 @@
 import Foundation
 
-/// Everything Tunnel needs to draw a convincing incoming call.
-/// Stored as JSON in UserDefaults via `Codable`.
+/// Legacy single-profile blob (pre–call profiles). **Migration only** — new data
+/// lives in `ProfilesState` / `app.callProfiles`. Kept so `JSONDecoder` can read
+/// old `UserDefaults` keys without data loss.
 ///
 /// Legacy-safe: `JSONDecoder` silently drops keys that aren't declared here,
 /// so previous versions' `fakePhoneNumber` in UserDefaults decodes cleanly

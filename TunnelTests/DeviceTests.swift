@@ -1,65 +1,33 @@
-import XCTest
+import Testing
 @testable import Tunnel
 
 /// Verifies the hardware-mapping that decides whether to surface
-/// Action-Button guidance in the UI. We test against known real model
-/// identifiers — getting one wrong would either show unactionable steps
-/// to a user without the button, or hide a valid path from someone who has it.
-final class DeviceTests: XCTestCase {
-
-    // MARK: - Has Action Button
-
-    func testHasActionButton_iPhone15Pro() {
-        XCTAssertTrue(Device.hasActionButton(identifier: "iPhone16,1"))
+/// Action-Button guidance in the UI.
+struct DeviceTests {
+    @Test(arguments: [
+        ("iPhone16,1", true),
+        ("iPhone16,2", true),
+        ("iPhone17,1", true),
+        ("iPhone17,3", true),
+        ("iPhone18,1", true),
+        ("iPhone25,9", true),
+    ])
+    func hasActionButton(identifier: String, expected: Bool) {
+        #expect(Device.hasActionButton(identifier: identifier) == expected)
     }
 
-    func testHasActionButton_iPhone15ProMax() {
-        XCTAssertTrue(Device.hasActionButton(identifier: "iPhone16,2"))
-    }
-
-    func testHasActionButton_iPhone16Pro() {
-        XCTAssertTrue(Device.hasActionButton(identifier: "iPhone17,1"))
-    }
-
-    func testHasActionButton_iPhone16Regular() {
-        XCTAssertTrue(Device.hasActionButton(identifier: "iPhone17,3"))
-    }
-
-    func testHasActionButton_futureModel() {
-        // Any iPhone18,X or later (iPhone 17 series, iPhone Air, …)
-        XCTAssertTrue(Device.hasActionButton(identifier: "iPhone18,1"))
-        XCTAssertTrue(Device.hasActionButton(identifier: "iPhone25,9"))
-    }
-
-    // MARK: - No Action Button
-
-    func testNoActionButton_iPhone15() {
-        // iPhone 15 (non-Pro) — still has the ring/silent switch.
-        XCTAssertFalse(Device.hasActionButton(identifier: "iPhone15,4"))
-    }
-
-    func testNoActionButton_iPhone15Plus() {
-        XCTAssertFalse(Device.hasActionButton(identifier: "iPhone15,5"))
-    }
-
-    func testNoActionButton_iPhone14Pro() {
-        XCTAssertFalse(Device.hasActionButton(identifier: "iPhone15,2"))
-    }
-
-    func testNoActionButton_iPhone8() {
-        XCTAssertFalse(Device.hasActionButton(identifier: "iPhone10,1"))
-    }
-
-    // MARK: - Defensive
-
-    func testNoActionButton_iPad() {
-        XCTAssertFalse(Device.hasActionButton(identifier: "iPad13,1"))
-    }
-
-    func testNoActionButton_malformed() {
-        XCTAssertFalse(Device.hasActionButton(identifier: "iPhone"))
-        XCTAssertFalse(Device.hasActionButton(identifier: "iPhoneXX,Y"))
-        XCTAssertFalse(Device.hasActionButton(identifier: ""))
-        XCTAssertFalse(Device.hasActionButton(identifier: "x86_64"))
+    @Test(arguments: [
+        ("iPhone15,4", false),
+        ("iPhone15,5", false),
+        ("iPhone15,2", false),
+        ("iPhone10,1", false),
+        ("iPad13,1", false),
+        ("iPhone", false),
+        ("iPhoneXX,Y", false),
+        ("", false),
+        ("x86_64", false),
+    ])
+    func noActionButton(identifier: String, expected: Bool) {
+        #expect(Device.hasActionButton(identifier: identifier) == expected)
     }
 }

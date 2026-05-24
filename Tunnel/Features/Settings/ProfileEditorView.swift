@@ -8,6 +8,36 @@ struct ProfileEditorView: View {
     let profileID: UUID
 
     @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Group {
+            if appState.profilesState.profiles.contains(where: { $0.id == profileID }) {
+                ProfileEditorForm(appState: appState, profileID: profileID)
+            } else {
+                ProfileEditorMissingView { dismiss() }
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct ProfileEditorMissingView: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ContentUnavailableView(
+            "Profil introuvable",
+            systemImage: "person.crop.circle.badge.exclamationmark",
+            description: Text("Ce profil a peut-être été supprimé.")
+        )
+        .onAppear(perform: onDismiss)
+    }
+}
+
+private struct ProfileEditorForm: View {
+    @Bindable var appState: AppState
+    let profileID: UUID
+
     @State private var photoSelection: PhotosPickerItem?
     @State private var subtitlePreset: ContactSubtitlePreset = .portable
 
@@ -15,22 +45,6 @@ struct ProfileEditorView: View {
     private static let avatarMaxDimension: CGFloat = 600
 
     var body: some View {
-        Group {
-            if appState.profilesState.profiles.contains(where: { $0.id == profileID }) {
-                editorForm
-            } else {
-                ContentUnavailableView(
-                    "Profil introuvable",
-                    systemImage: "person.crop.circle.badge.exclamationmark",
-                    description: Text("Ce profil a peut-être été supprimé.")
-                )
-                .onAppear { dismiss() }
-            }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var editorForm: some View {
         Form {
             Section {
                 CallProfilePreviewCard(profile: profileBinding.wrappedValue)
@@ -40,67 +54,16 @@ struct ProfileEditorView: View {
                 Text("Visible aussi sur l’appel entrant.")
             }
 
-            Section {
-                HStack(spacing: 14) {
-                    ProfileAvatarView(
-                        imageData: profileBinding.wrappedValue.contactImageData,
-                        size: Self.avatarSize,
-                        placeholderIconSize: 28
-                    )
-                    VStack(alignment: .leading, spacing: 8) {
-                        PhotosPicker(selection: $photoSelection, matching: .images, photoLibrary: .shared()) {
-                            Label(hasImage ? "Remplacer la photo" : "Choisir une photo", systemImage: "photo.on.rectangle.angled")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .buttonStyle(.borderless)
+            ProfileEditorPhotoSection(
+                profile: profileBinding,
+                photoSelection: $photoSelection,
+                onRemovePhoto: removePhoto
+            )
 
-                        if hasImage {
-                            Button("Retirer la photo", role: .destructive) {
-                                photoSelection = nil
-                                profileBinding.wrappedValue.contactImageData = nil
-                            }
-                            .font(.subheadline)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Photo")
-            }
-
-            Section {
-                TextField("", text: Binding(
-                    get: { profileBinding.wrappedValue.contactName },
-                    set: { profileBinding.wrappedValue.contactName = $0 }
-                ), prompt: Text("ex. Crèche"))
-                .textContentType(.name)
-                .textInputAutocapitalization(.words)
-
-                Picker("Type de ligne", selection: $subtitlePreset) {
-                    ForEach(ContactSubtitlePreset.allCases.filter { $0 != .personnalise }) { preset in
-                        Text(preset.label).tag(preset)
-                    }
-                    Text(ContactSubtitlePreset.personnalise.label).tag(ContactSubtitlePreset.personnalise)
-                }
-                .onChange(of: subtitlePreset) { _, new in
-                    if new != .personnalise {
-                        profileBinding.wrappedValue.contactSubtitle = new.storedValue
-                    }
-                }
-
-                if subtitlePreset == .personnalise {
-                    TextField("", text: Binding(
-                        get: { profileBinding.wrappedValue.contactSubtitle },
-                        set: { profileBinding.wrappedValue.contactSubtitle = $0 }
-                    ), prompt: Text("ex. iPhone, Urgence"))
-                    .textInputAutocapitalization(.sentences)
-                }
-            } header: {
-                Text("Qui appelle ?")
-            } footer: {
-                Text("Nom et légende, comme dans Téléphone.")
-            }
+            ProfileEditorIdentitySection(
+                profile: profileBinding,
+                subtitlePreset: $subtitlePreset
+            )
         }
         .navigationTitle(profileTitle)
         .onAppear {
@@ -115,9 +78,7 @@ struct ProfileEditorView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    appState.duplicateProfile(id: profileID)
-                } label: {
+                Button(action: duplicateProfile) {
                     Image(systemName: "plus.square.on.square")
                 }
                 .accessibilityLabel("Dupliquer le profil")
@@ -125,25 +86,27 @@ struct ProfileEditorView: View {
         }
     }
 
-    /// Only used when `profileID` exists in `profilesState` (see `editorForm`).
     private var profileBinding: Binding<CallProfile> {
         Binding(
             get: {
                 appState.profilesState.profiles.first(where: { $0.id == profileID })!
             },
-            set: { updated in
-                appState.upsertProfile(updated)
-            }
+            set: { appState.upsertProfile($0) }
         )
-    }
-
-    private var hasImage: Bool {
-        profileBinding.wrappedValue.contactImageData != nil
     }
 
     private var profileTitle: String {
         let t = profileBinding.wrappedValue.contactName.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? "Profil" : t
+    }
+
+    private func removePhoto() {
+        photoSelection = nil
+        profileBinding.wrappedValue.contactImageData = nil
+    }
+
+    private func duplicateProfile() {
+        appState.duplicateProfile(id: profileID)
     }
 
     private func loadPickedPhoto(_ item: PhotosPickerItem) async {
@@ -160,7 +123,78 @@ struct ProfileEditorView: View {
                 profileBinding.wrappedValue.contactImageData = jpegData
             }
         } catch {
-            // Silent fail: photo is optional, user can retry.
+            // Photo is optional; user can retry.
+        }
+    }
+}
+
+private struct ProfileEditorPhotoSection: View {
+    @Binding var profile: CallProfile
+    @Binding var photoSelection: PhotosPickerItem?
+    let onRemovePhoto: () -> Void
+
+    var body: some View {
+        Section {
+            HStack(spacing: 14) {
+                ProfileAvatarView(
+                    imageData: profile.contactImageData,
+                    size: 72,
+                    placeholderIconSize: 28
+                )
+                VStack(alignment: .leading, spacing: 8) {
+                    PhotosPicker(selection: $photoSelection, matching: .images, photoLibrary: .shared()) {
+                        Label(
+                            profile.contactImageData != nil ? "Remplacer la photo" : "Choisir une photo",
+                            systemImage: "photo.on.rectangle.angled"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+
+                    if profile.contactImageData != nil {
+                        Button("Retirer la photo", role: .destructive, action: onRemovePhoto)
+                            .font(.subheadline)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Photo")
+        }
+    }
+}
+
+private struct ProfileEditorIdentitySection: View {
+    @Binding var profile: CallProfile
+    @Binding var subtitlePreset: ContactSubtitlePreset
+
+    var body: some View {
+        Section {
+            TextField("", text: $profile.contactName, prompt: Text("ex. Crèche"))
+                .textContentType(.name)
+                .textInputAutocapitalization(.words)
+
+            Picker("Type de ligne", selection: $subtitlePreset) {
+                ForEach(ContactSubtitlePreset.allCases.filter { $0 != .personnalise }) { preset in
+                    Text(preset.label).tag(preset)
+                }
+                Text(ContactSubtitlePreset.personnalise.label).tag(ContactSubtitlePreset.personnalise)
+            }
+            .onChange(of: subtitlePreset) { _, new in
+                if new != .personnalise {
+                    profile.contactSubtitle = new.storedValue
+                }
+            }
+
+            if subtitlePreset == .personnalise {
+                TextField("", text: $profile.contactSubtitle, prompt: Text("ex. iPhone, Urgence"))
+                    .textInputAutocapitalization(.sentences)
+            }
+        } header: {
+            Text("Qui appelle ?")
+        } footer: {
+            Text("Nom et légende, comme dans Téléphone.")
         }
     }
 }

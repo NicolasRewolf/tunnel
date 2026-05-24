@@ -2,11 +2,6 @@ import SwiftUI
 
 /// Home screen: hero icon, name, primary CTA (or armed-timer cancel),
 /// secondary Raccourcis / Réglages.
-///
-/// Two states drive the layout, both read from `AppState.armedDeadline`:
-///  - **Idle** — timer button (circular glass) + "Sortir du tunnel" CTA.
-///  - **Armed** — CTA morphs into a destructive countdown; the hero icon
-///    gains a progression ring that drains to the deadline.
 struct HomeView: View {
     let appState: AppState
     @State private var pulseRing = false
@@ -16,32 +11,21 @@ struct HomeView: View {
 
     private var isArmed: Bool { appState.armedDeadline != nil }
 
-    /// Bridges `appState.screen` to a `Bool` binding usable by `.sheet`.
-    /// When the user dismisses the sheet (swipe / Fermer), flips screen
-    /// back to `.home` — but only if we're still on the matching screen,
-    /// to avoid clobbering a concurrent transition (e.g. settings →
-    /// onboarding via the cross-link).
-    private func routedSheetBinding(for screen: AppState.Screen) -> Binding<Bool> {
-        Binding(
-            get: { appState.screen == screen },
-            set: { isPresented in
-                if !isPresented && appState.screen == screen {
-                    appState.screen = .home
-                }
-            }
-        )
-    }
-
     var body: some View {
         ZStack {
-            backgroundLayer
+            HomeBackgroundLayer()
 
             VStack(spacing: 0) {
                 Spacer()
                     .frame(height: 60)
 
-                heroIcon
-                    .padding(.bottom, 40)
+                HomeHeroIcon(
+                    isArmed: isArmed,
+                    armedDeadline: appState.armedDeadline,
+                    armedTotalDuration: appState.armedTotalDuration,
+                    pulseRing: $pulseRing
+                )
+                .padding(.bottom, 40)
 
                 VStack(spacing: 8) {
                     Text("Tunnel")
@@ -50,32 +34,22 @@ struct HomeView: View {
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityLabel("Untunnel")
 
-                    subtitle
+                    HomeSubtitle(armedDeadline: appState.armedDeadline)
                 }
 
                 Spacer()
 
-                primaryControls
+                HomePrimaryControls(
+                    armedDeadline: appState.armedDeadline,
+                    onShowTimerPicker: presentTimerPicker,
+                    onTriggerCall: triggerCall,
+                    onCancelTimer: cancelTimer
+                )
 
-                HStack(spacing: 12) {
-                    Button { appState.openOnboarding() } label: {
-                        Label("Raccourcis", systemImage: "hand.tap.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
-                    .accessibilityLabel("Configurer les raccourcis de déclenchement")
-
-                    Button { appState.openSettings() } label: {
-                        Label("Réglages", systemImage: "gearshape.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
-                    .accessibilityLabel("Ouvrir les réglages")
-                }
+                HomeSecondaryActions(
+                    onOpenOnboarding: { appState.openOnboarding() },
+                    onOpenSettings: { appState.openSettings() }
+                )
                 .padding(.top, 12)
             }
             .padding(.horizontal, 20)
@@ -101,16 +75,9 @@ struct HomeView: View {
             OnboardingView(appState: appState)
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showShortcutAnnouncement, onDismiss: {
-            appState.markShortcutAnnouncementSeen()
-        }) {
+        .sheet(isPresented: $showShortcutAnnouncement, onDismiss: markShortcutAnnouncementSeen) {
             ShortcutAnnouncementSheet(
-                onOpenShortcuts: {
-                    if let url = URL(string: "shortcuts://") {
-                        UIApplication.shared.open(url)
-                    }
-                    showShortcutAnnouncement = false
-                },
+                onOpenShortcuts: openShortcutsFromAnnouncement,
                 onDismiss: { showShortcutAnnouncement = false }
             )
             .presentationDetents([.medium])
@@ -119,113 +86,13 @@ struct HomeView: View {
         .sheet(item: $pendingUpdate) { outcome in
             UpdateAvailableSheet(
                 latestVersion: outcome.latestVersion,
-                onUpdate: {
-                    UIApplication.shared.open(outcome.appStoreURL)
-                    pendingUpdate = nil
-                },
-                onDismiss: {
-                    UpdateChecker.snooze()
-                    pendingUpdate = nil
-                }
+                onUpdate: { openAppStore(outcome) },
+                onDismiss: dismissUpdatePrompt
             )
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
-        .task {
-            // Don't double-prompt on the same launch. The shortcut
-            // announcement (one-shot, post-update) takes precedence; the
-            // update checker fires next launch.
-            if appState.shouldOfferShortcutAnnouncement {
-                showShortcutAnnouncement = true
-                return
-            }
-            pendingUpdate = await UpdateChecker.checkForAvailableUpdate()
-        }
-    }
-
-    // MARK: - Subtitle
-
-    @ViewBuilder
-    private var subtitle: some View {
-        if let deadline = appState.armedDeadline {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text("Sortie du tunnel dans \(Self.countdown(until: deadline, at: context.date))")
-                    .font(.body.monospacedDigit())
-                    .foregroundStyle(Theme.green)
-                    .contentTransition(.numericText(countsDown: true))
-            }
-        } else {
-            Text("Sortir d'une conversation en un geste.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
-    }
-
-    // MARK: - Primary controls (idle vs armed)
-
-    @ViewBuilder
-    private var primaryControls: some View {
-        if let deadline = appState.armedDeadline {
-            armedCTA(deadline: deadline)
-        } else {
-            idleControls
-        }
-    }
-
-    private var idleControls: some View {
-        HStack(spacing: 12) {
-            Button {
-                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                showTimerPicker = true
-            } label: {
-                Image(systemName: "timer")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 56, height: 56)
-            }
-            .buttonStyle(.glass)
-            .clipShape(Circle())
-            .accessibilityLabel("Programmer un faux appel plus tard")
-
-            Button(action: triggerCall) {
-                HStack(spacing: 10) {
-                    Image(systemName: "phone.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                    Text("Sortir du tunnel")
-                        .font(.system(size: 17, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.extraLarge)
-            .tint(Theme.green)
-            .accessibilityLabel("Sortir du tunnel, déclenche un faux appel")
-        }
-    }
-
-    private func armedCTA(deadline: Date) -> some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            Button(action: cancelTimer) {
-                HStack(spacing: 10) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("Annuler · \(Self.countdown(until: deadline, at: context.date))")
-                        .font(.system(size: 17, weight: .semibold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText(countsDown: true))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.extraLarge)
-            .tint(Theme.red)
-            .accessibilityLabel("Annuler le minuteur")
-            .accessibilityValue("Sortie du tunnel dans \(Self.countdown(until: deadline, at: context.date))")
-        }
+        .task { await presentStartupSheetsIfNeeded() }
     }
 
     // MARK: - Error toast
@@ -244,7 +111,25 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Sheet routing
+
+    private func routedSheetBinding(for screen: AppState.Screen) -> Binding<Bool> {
+        Binding(
+            get: { appState.screen == screen },
+            set: { isPresented in
+                if !isPresented && appState.screen == screen {
+                    appState.screen = .home
+                }
+            }
+        )
+    }
+
     // MARK: - Actions
+
+    private func presentTimerPicker() {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        showTimerPicker = true
+    }
 
     private func triggerCall() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -256,105 +141,62 @@ struct HomeView: View {
         appState.disarmTimer()
     }
 
-    // MARK: - Hero
-
-    private var backgroundLayer: some View {
-        ZStack {
-            Color(.systemGroupedBackground)
-                .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [Theme.green.opacity(0.15), .clear],
-                center: .init(x: 0.5, y: 0.22),
-                startRadius: 0,
-                endRadius: 420
-            )
-            .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [Color.accentColor.opacity(0.10), .clear],
-                center: .init(x: 0.5, y: 0.85),
-                startRadius: 0,
-                endRadius: 380
-            )
-            .ignoresSafeArea()
-        }
+    private func markShortcutAnnouncementSeen() {
+        appState.markShortcutAnnouncementSeen()
     }
 
-    private var heroIcon: some View {
-        ZStack {
-            if isArmed {
-                progressionRing
-            } else {
-                pulseRings
+    private func openShortcutsFromAnnouncement() {
+        if let url = URL(string: "shortcuts://") {
+            UIApplication.shared.open(url)
+        }
+        showShortcutAnnouncement = false
+    }
+
+    private func openAppStore(_ outcome: UpdateChecker.Outcome) {
+        UIApplication.shared.open(outcome.appStoreURL)
+        pendingUpdate = nil
+    }
+
+    private func dismissUpdatePrompt() {
+        UpdateChecker.snooze()
+        pendingUpdate = nil
+    }
+
+    private func presentStartupSheetsIfNeeded() async {
+        if appState.shouldOfferShortcutAnnouncement {
+            showShortcutAnnouncement = true
+            return
+        }
+        pendingUpdate = await UpdateChecker.checkForAvailableUpdate()
+    }
+}
+
+// MARK: - Secondary actions
+
+private struct HomeSecondaryActions: View {
+    let onOpenOnboarding: () -> Void
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onOpenOnboarding) {
+                Label("Raccourcis", systemImage: "hand.tap.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
             }
+            .buttonStyle(.glass)
+            .controlSize(.large)
+            .accessibilityLabel("Configurer les raccourcis de déclenchement")
 
-            Image(systemName: isArmed ? "timer" : "phone.fill")
-                .font(.system(size: 52, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 130, height: 130)
-                .glassEffect(.regular.tint(Theme.green), in: .circle)
-                .shadow(color: Theme.greenDeep.opacity(0.5), radius: 22, x: 0, y: 10)
-                .contentTransition(.symbolEffect(.replace))
-        }
-        .onAppear { pulseRing = true }
-        // L’icône redondante avec les libellés d’action ; on évite la répétition en VoiceOver.
-        .accessibilityHidden(true)
-    }
-
-    private var pulseRings: some View {
-        ZStack {
-            Circle()
-                .stroke(Theme.green.opacity(0.25), lineWidth: 1)
-                .frame(width: 170, height: 170)
-                .scaleEffect(pulseRing ? 1.12 : 1.0)
-                .opacity(pulseRing ? 0 : 1)
-                .animation(
-                    .easeOut(duration: 2.2).repeatForever(autoreverses: false),
-                    value: pulseRing
-                )
-
-            Circle()
-                .stroke(Theme.green.opacity(0.35), lineWidth: 1)
-                .frame(width: 150, height: 150)
-                .scaleEffect(pulseRing ? 1.15 : 1.0)
-                .opacity(pulseRing ? 0 : 1)
-                .animation(
-                    .easeOut(duration: 2.2).repeatForever(autoreverses: false).delay(0.6),
-                    value: pulseRing
-                )
-        }
-    }
-
-    @ViewBuilder
-    private var progressionRing: some View {
-        if let deadline = appState.armedDeadline, appState.armedTotalDuration > 0 {
-            let total = appState.armedTotalDuration
-            TimelineView(.animation(minimumInterval: 0.05, paused: false)) { context in
-                let remaining = max(0, deadline.timeIntervalSince(context.date))
-                let progress = max(0, min(1, 1 - (remaining / total)))
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(
-                        Theme.green,
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 158, height: 158)
+            Button(action: onOpenSettings) {
+                Label("Réglages", systemImage: "gearshape.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
             }
+            .buttonStyle(.glass)
+            .controlSize(.large)
+            .accessibilityLabel("Ouvrir les réglages")
         }
-    }
-
-    // MARK: - Countdown helper
-
-    /// Formats `mm:ss` remaining between `now` and `deadline`, clamped at 0.
-    /// Rounds up so the first second shown matches the arming duration
-    /// (arming at 15:00.000 shows 15:00, not 14:59).
-    private static func countdown(until deadline: Date, at now: Date) -> String {
-        let remaining = max(0, Int(deadline.timeIntervalSince(now).rounded(.up)))
-        let minutes = remaining / 60
-        let seconds = remaining % 60
-        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 
